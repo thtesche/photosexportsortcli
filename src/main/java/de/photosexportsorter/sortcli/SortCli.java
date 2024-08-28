@@ -71,7 +71,13 @@ class SortCli implements Callable<Integer> {
         } else {
             datePart = fileNameParts[0];
         }
-        String newDatePart = datePart.replace("März", "März");
+        
+        // Replacement for macs canonical decomposition
+        // https://developer.apple.com/library/archive/technotes/tn/tn1150.html#UnicodeSubtleties
+        // In Germany there is only the March (März) which is affected. More replacements needs
+        // to be added for other locales.
+        // As the output date is an ISO date there are no longer non iso chars existent. 
+        String newDatePart = datePart.replace("ä", "ä");
 
         LocalDate inDate = LocalDate.parse(newDatePart, DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(new Locale(locale)));
 
