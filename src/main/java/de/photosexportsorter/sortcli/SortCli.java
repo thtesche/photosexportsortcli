@@ -13,6 +13,8 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -27,10 +29,9 @@ class SortCli implements Callable<Integer> {
 
     @Option(names = "--target", description = "target folder for transformed directory structure")
     private File target;
-    
+
     @Option(names = "--locale", description = "Locale to transform the date e.g. en, de ...")
     private String locale;
-    
 
     public static void main(String[] args) {
         int exitCode = new CommandLine(new SortCli()).execute(args);
@@ -56,7 +57,7 @@ class SortCli implements Callable<Integer> {
 
     }
 
-    private String re_sort_location_date(String dir, String locale) {
+    private OutDir re_sort_location_date(String dir, String locale) {
 
         String[] dirParts = dir.split("/");
 
@@ -71,7 +72,7 @@ class SortCli implements Callable<Integer> {
         } else {
             datePart = fileNameParts[0];
         }
-        
+
         // Replacement for macs canonical decomposition
         // https://developer.apple.com/library/archive/technotes/tn/tn1150.html#UnicodeSubtleties
         // In Germany there is only the March (März) which is affected. More replacements needs
@@ -83,7 +84,21 @@ class SortCli implements Callable<Integer> {
 
         String outDateString = DateTimeFormatter.ISO_DATE.format(inDate);
 
-        return outDateString + reSortedDirName;
+        return new OutDir(inDate.getYear(), outDateString + reSortedDirName);
+
+    }
+
+    @Getter
+    @AllArgsConstructor
+    private class OutDir {
+
+        int year;
+        String reSortedFileName;
+
+        @Override
+        public String toString() {
+            return "OutDir{" + "year=" + year + ", reSortedFileName=" + reSortedFileName + '}';
+        }
 
     }
 }
