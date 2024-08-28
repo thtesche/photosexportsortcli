@@ -8,6 +8,7 @@ import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
@@ -26,6 +27,10 @@ class SortCli implements Callable<Integer> {
 
     @Option(names = "--target", description = "target folder for transformed directory structure")
     private File target;
+    
+    @Option(names = "--locale", description = "Locale to transform the date e.g. en, de ...")
+    private String locale;
+    
 
     public static void main(String[] args) {
         int exitCode = new CommandLine(new SortCli()).execute(args);
@@ -35,7 +40,7 @@ class SortCli implements Callable<Integer> {
     @Override
     public Integer call() throws Exception {
         Set<String> dirsInDir = listDirsUsingFilesList(source.getAbsolutePath());
-        dirsInDir.forEach(dir -> System.out.println(re_sort_location_date(dir)));
+        dirsInDir.forEach(dir -> System.out.println(re_sort_location_date(dir, locale)));
 
         return 0;
     }
@@ -51,7 +56,7 @@ class SortCli implements Callable<Integer> {
 
     }
 
-    private String re_sort_location_date(String dir) {
+    private String re_sort_location_date(String dir, String locale) {
 
         String[] dirParts = dir.split("/");
 
@@ -66,10 +71,9 @@ class SortCli implements Callable<Integer> {
         } else {
             datePart = fileNameParts[0];
         }
-        String newDatePart = datePart.replace("März", "Mrz");
-        System.out.println(newDatePart);
+        String newDatePart = datePart.replace("März", "März");
 
-        LocalDate inDate = LocalDate.parse(newDatePart, DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG));
+        LocalDate inDate = LocalDate.parse(newDatePart, DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(new Locale(locale)));
 
         String outDateString = DateTimeFormatter.ISO_DATE.format(inDate);
 
