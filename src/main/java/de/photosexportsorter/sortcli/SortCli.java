@@ -5,6 +5,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
@@ -21,7 +24,7 @@ class SortCli implements Callable<Integer> {
     @Option(names = "--source", description = "source folder with mac photos app export")
     private File source;
 
-    @Option(names="--target", description = "target folder for transformed directory structure")
+    @Option(names = "--target", description = "target folder for transformed directory structure")
     private File target;
 
     public static void main(String[] args) {
@@ -31,19 +34,46 @@ class SortCli implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-        Set<String> filesInDir = listDirsUsingFilesList(source.getAbsolutePath());
-        filesInDir.forEach(dir -> System.out.println(dir));
+        Set<String> dirsInDir = listDirsUsingFilesList(source.getAbsolutePath());
+        dirsInDir.forEach(dir -> System.out.println(re_sort_location_date(dir)));
 
         return 0;
     }
-    
-    public Set<String> listDirsUsingFilesList(String dir) throws IOException {
-    try (Stream<Path> stream = Files.list(Paths.get(dir))) {
-        return stream
-          .filter(file -> Files.isDirectory(file))
-          .map(Path::toAbsolutePath)
-          .map(Path::toString)
-          .collect(Collectors.toSet());
+
+    private Set<String> listDirsUsingFilesList(String dir) throws IOException {
+        try (Stream<Path> stream = Files.list(Paths.get(dir))) {
+            return stream
+                    .filter(file -> Files.isDirectory(file))
+                    .map(Path::toAbsolutePath)
+                    .map(Path::toString)
+                    .collect(Collectors.toSet());
+        }
+
     }
-}
+
+    private String re_sort_location_date(String dir) {
+
+        String[] dirParts = dir.split("/");
+
+        String fileNameParts[] = dirParts[dirParts.length - 1].split(",");
+        String reSortedDirName = "";
+
+        String datePart;
+
+        if (fileNameParts.length == 2) {
+            reSortedDirName = ", " + fileNameParts[0].trim();
+            datePart = fileNameParts[1].trim();
+        } else {
+            datePart = fileNameParts[0];
+        }
+        String newDatePart = datePart.replace("März", "Mrz");
+        System.out.println(newDatePart);
+
+        LocalDate inDate = LocalDate.parse(newDatePart, DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG));
+
+        String outDateString = DateTimeFormatter.ISO_DATE.format(inDate);
+
+        return outDateString + reSortedDirName;
+
+    }
 }
