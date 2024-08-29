@@ -11,8 +11,12 @@ import java.time.format.FormatStyle;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import jdk.jshell.spi.ExecutionControl;
+import jdk.jshell.spi.ExecutionControl.RunException;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -41,9 +45,22 @@ class SortCli implements Callable<Integer> {
     @Override
     public Integer call() throws Exception {
         Set<String> dirsInDir = listDirsUsingFilesList(source.getAbsolutePath());
-        dirsInDir.forEach(dir -> System.out.println(re_sort_location_date(dir, locale)));
+        dirsInDir.forEach(dir -> {
+            try {
+                createTargetDirs(re_sort_location_date(dir, locale));
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
 
         return 0;
+    }
+
+    private PathInfo createTargetDirs(PathInfo pathInfo) throws IOException {
+        Path path = Paths.get(target.getAbsolutePath(), pathInfo.getYearDayLocation());
+        Path newTargetDir = Files.createDirectories(path);
+        System.out.println(newTargetDir.toString());
+        return pathInfo;
     }
 
     private Set<String> listDirsUsingFilesList(String dir) throws IOException {
@@ -57,7 +74,7 @@ class SortCli implements Callable<Integer> {
 
     }
 
-    private OutDir re_sort_location_date(String dir, String locale) {
+    private PathInfo re_sort_location_date(String dir, String locale) {
 
         String[] dirParts = dir.split("/");
 
@@ -77,27 +94,32 @@ class SortCli implements Callable<Integer> {
         // https://developer.apple.com/library/archive/technotes/tn/tn1150.html#UnicodeSubtleties
         // In Germany there is only the March (März) which is affected. More replacements needs
         // to be added for other locales.
-        // As the output date is an ISO date there are no longer non iso chars existent. 
+        // As the output date is an ISO date there are no longer non iso chars existent at this stage. 
         String newDatePart = datePart.replace("ä", "ä");
 
         LocalDate inDate = LocalDate.parse(newDatePart, DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(new Locale(locale)));
 
         String outDateString = DateTimeFormatter.ISO_DATE.format(inDate);
 
-        return new OutDir(inDate.getYear(), outDateString + reSortedDirName);
+        return new PathInfo(dir, inDate.getYear(), outDateString + reSortedDirName);
 
     }
 
     @Getter
     @AllArgsConstructor
-    private class OutDir {
+    private class PathInfo {
 
+        String originDir;
         int year;
         String reSortedFileName;
 
+        public String getYearDayLocation() {
+            return Integer.toString(year) + "/" + reSortedFileName;
+        }
+
         @Override
         public String toString() {
-            return "OutDir{" + "year=" + year + ", reSortedFileName=" + reSortedFileName + '}';
+            return "InDir= " + originDir + ", OutDir{" + "year=" + year + ", reSortedFileName=" + reSortedFileName + '}';
         }
 
     }
