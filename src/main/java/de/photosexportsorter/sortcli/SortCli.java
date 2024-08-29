@@ -11,14 +11,11 @@ import java.time.format.FormatStyle;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import jdk.jshell.spi.ExecutionControl;
-import jdk.jshell.spi.ExecutionControl.RunException;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import org.apache.commons.io.FileUtils;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -47,7 +44,8 @@ class SortCli implements Callable<Integer> {
         Set<String> dirsInDir = listDirsUsingFilesList(source.getAbsolutePath());
         dirsInDir.forEach(dir -> {
             try {
-                createTargetDirs(re_sort_location_date(dir, locale));
+                PathInfo pathInfo = createTargetDirs(re_sort_location_date(dir, locale));
+                FileUtils.copyDirectory(new File(pathInfo.sourceDir), new File(pathInfo.targetDir));
             } catch (IOException ex) {
                 throw new RuntimeException(ex);
             }
@@ -57,7 +55,7 @@ class SortCli implements Callable<Integer> {
     }
 
     private PathInfo createTargetDirs(PathInfo pathInfo) throws IOException {
-        Path path = Paths.get(target.getAbsolutePath(), pathInfo.getYearDayLocation());
+        Path path = Paths.get(pathInfo.getTargetDir());
         Path newTargetDir = Files.createDirectories(path);
         System.out.println(newTargetDir.toString());
         return pathInfo;
@@ -101,7 +99,7 @@ class SortCli implements Callable<Integer> {
 
         String outDateString = DateTimeFormatter.ISO_DATE.format(inDate);
 
-        return new PathInfo(dir, inDate.getYear(), outDateString + reSortedDirName);
+        return new PathInfo(dir, Paths.get(target.getAbsolutePath(), Integer.toString(inDate.getYear()), outDateString + reSortedDirName).toString());
 
     }
 
@@ -109,17 +107,12 @@ class SortCli implements Callable<Integer> {
     @AllArgsConstructor
     private class PathInfo {
 
-        String originDir;
-        int year;
-        String reSortedFileName;
-
-        public String getYearDayLocation() {
-            return Integer.toString(year) + "/" + reSortedFileName;
-        }
+        String sourceDir;
+        String targetDir;
 
         @Override
         public String toString() {
-            return "InDir= " + originDir + ", OutDir{" + "year=" + year + ", reSortedFileName=" + reSortedFileName + '}';
+            return "sourceDir= " + sourceDir + ", targetDir=" + targetDir;
         }
 
     }
