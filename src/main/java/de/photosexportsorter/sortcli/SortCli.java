@@ -25,14 +25,17 @@ import picocli.CommandLine.Option;
         description = "Sorts export structur (directories of mac's photos app")
 class SortCli implements Callable<Integer> {
 
-    @Option(names = "--source", description = "source folder with mac photos app export")
+    @Option(names = "--sourceRoot", description = "source folder with mac photos app export")
     private File source;
 
-    @Option(names = "--target", description = "target folder for transformed directory structure")
+    @Option(names = "--targetRoot", description = "target folder for transformed directory structure")
     private File target;
 
     @Option(names = "--locale", description = "Locale to transform the date e.g. en, de ...")
     private String locale;
+
+    @Option(names = "--deleteSource", description = "delete the copied source folder. default is false")
+    private boolean deleteSource = false;
 
     public static void main(String[] args) {
         int exitCode = new CommandLine(new SortCli()).execute(args);
@@ -46,6 +49,9 @@ class SortCli implements Callable<Integer> {
             try {
                 PathInfo pathInfo = createTargetDirs(re_sort_location_date(dir, locale));
                 FileUtils.copyDirectory(new File(pathInfo.sourceDir), new File(pathInfo.targetDir));
+                if (deleteSource) {
+                    FileUtils.deleteQuietly(new File(pathInfo.sourceDir));
+                }
             } catch (IOException ex) {
                 throw new RuntimeException(ex);
             }
