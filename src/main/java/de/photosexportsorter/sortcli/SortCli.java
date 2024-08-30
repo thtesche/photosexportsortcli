@@ -13,8 +13,6 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 import org.apache.commons.io.FileUtils;
 
 import picocli.CommandLine;
@@ -48,9 +46,9 @@ class SortCli implements Callable<Integer> {
         dirsInDir.forEach(dir -> {
             try {
                 PathInfo pathInfo = createTargetDirs(re_sort_location_date(dir, locale));
-                FileUtils.copyDirectory(new File(pathInfo.sourceDir), new File(pathInfo.targetDir));
+                FileUtils.copyDirectory(new File(pathInfo.sourceDir()), new File(pathInfo.targetDir()));
                 if (deleteSource) {
-                    FileUtils.deleteQuietly(new File(pathInfo.sourceDir));
+                    FileUtils.deleteQuietly(new File(pathInfo.sourceDir()));
                 }
             } catch (IOException ex) {
                 throw new RuntimeException(ex);
@@ -61,7 +59,7 @@ class SortCli implements Callable<Integer> {
     }
 
     private PathInfo createTargetDirs(PathInfo pathInfo) throws IOException {
-        Path path = Paths.get(pathInfo.getTargetDir());
+        Path path = Paths.get(pathInfo.targetDir());
         Path newTargetDir = Files.createDirectories(path);
         System.out.println(newTargetDir.toString());
         return pathInfo;
@@ -109,17 +107,10 @@ class SortCli implements Callable<Integer> {
 
     }
 
-    @Getter
-    @AllArgsConstructor
-    private class PathInfo {
-
-        String sourceDir;
-        String targetDir;
-
+    private record PathInfo(String sourceDir, String targetDir) {
         @Override
         public String toString() {
             return "sourceDir= " + sourceDir + ", targetDir=" + targetDir;
         }
-
     }
 }
