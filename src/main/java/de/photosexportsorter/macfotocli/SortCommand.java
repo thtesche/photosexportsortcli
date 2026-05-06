@@ -1,4 +1,4 @@
-package de.photosexportsorter.sortcli;
+package de.photosexportsorter.macfotocli;
 
 import java.io.File;
 import java.io.IOException;
@@ -18,45 +18,28 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
-@Command(name = "sortcli", mixinStandardHelpOptions = true, version = "sortcli 1.0", description = "Reorganizes Apple Photos exports into a clean, chronological structure.", header = {
-        "@|bold,cyan  ____  _           _            ____             _      ____ _     ___ |@",
-        "@|bold,cyan |  _ \\| |__   ___ | |_ ___     / ___|  ___  _ __| |_   / ___| |   |_ _||@",
-        "@|bold,cyan | |_) | '_ \\ / _ \\| __/ _ \\    \\___ \\ / _ \\| '__| __| | |   | |    | | |@",
-        "@|bold,cyan |  __/| | | | (_) | || (_) |    ___) | (_) | |  | |_  | |___| |___ | | |@",
-        "@|bold,cyan |_|   |_| |_|\\___/ \\__\\___/    |____/ \\___/|_|   \\__|  \\____|_____|___||@",
-        ""
-})
-class SortCli implements Callable<Integer> {
+@Command(name = "sort", description = "Reorganizes Apple Photos exports into a clean, chronological structure.")
+public class SortCommand implements Callable<Integer> {
 
     @CommandLine.Spec
     CommandLine.Model.CommandSpec spec;
 
-    @Option(names = "--sourceRoot", description = "source folder with mac photos app export")
+    @Option(names = "--sourceRoot", required = true, description = "source folder with mac photos app export")
     private File source;
 
-    @Option(names = "--targetRoot", description = "target folder for transformed directory structure")
+    @Option(names = "--targetRoot", required = true, description = "target folder for transformed directory structure")
     File target;
 
-    @Option(names = "--locale", description = "Locale to transform the date e.g. en, de ...")
+    @Option(names = "--locale", required = true, description = "Locale to transform the date e.g. en, de ...")
     private String locale;
 
     @Option(names = "--deleteSource", description = "delete the copied source folder. default is false")
     private boolean deleteSource = false;
 
-    public static void main(String[] args) {
-        int exitCode = new CommandLine(new SortCli()).execute(args);
-        System.exit(exitCode);
-    }
-
     @Override
     public Integer call() throws Exception {
-        if (source == null || !source.exists() || !source.isDirectory()) {
+        if (!source.exists() || !source.isDirectory()) {
             spec.commandLine().getErr().println("@|red Error: Source root must be a valid directory.|@");
-            return 1;
-        }
-
-        if (target == null) {
-            spec.commandLine().getErr().println("@|red Error: Target root must be specified.|@");
             return 1;
         }
 
@@ -104,10 +87,8 @@ class SortCli implements Callable<Integer> {
     PathInfo re_sort_location_date(String dir, String locale) {
 
         String[] dirParts = dir.split("/");
-
-        String fileNameParts[] = dirParts[dirParts.length - 1].split(",", 2);
+        String[] fileNameParts = dirParts[dirParts.length - 1].split(",", 2);
         String reSortedDirName = "";
-
         String datePart;
 
         if (fileNameParts.length == 2) {
@@ -117,13 +98,6 @@ class SortCli implements Callable<Integer> {
             datePart = fileNameParts[0];
         }
 
-        // Replacement for macs canonical decomposition
-        // https://developer.apple.com/library/archive/technotes/tn/tn1150.html#UnicodeSubtleties
-        // In Germany there is only the March (März) which is affected. More
-        // replacements needs
-        // to be added for other locales.
-        // As the output date is an ISO date there are no longer non iso chars existent
-        // at this stage.
         String newDatePart = datePart.replace("ä", "ä");
 
         LocalDate inDate = LocalDate.parse(newDatePart,

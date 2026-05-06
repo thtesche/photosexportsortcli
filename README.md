@@ -1,80 +1,78 @@
-# 📸 PhotoExportSortCLI
+# MacFotoCli 📸🚀
 
-[![Java Version](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/25/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Build](https://img.shields.io/badge/Build-Maven-red.svg)](https://maven.apache.org/)
+[![Java CI with Maven](https://github.com/thtesche/photosexportsortcli/actions/workflows/maven.yml/badge.svg)](https://github.com/thtesche/photosexportsortcli/actions/workflows/maven.yml)
+[![Java Version](https://img.shields.io/badge/Java-25-blue.svg)](https://adoptium.net/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A premium command-line utility designed to elegantly reorganize Apple® Photos exports. Transform cluttered export structures into a clean, chronological, and localized directory hierarchy.
+**MacFotoCli** (formerly SortCli) is a powerful, modern Java 25 command-line tool designed to reorganize and enhance Apple Photos exports.
 
-## ✨ Features
-
-- **Chronological Sorting**: Automatically groups photos by year and ISO-formatted dates.
-- **Smart Renaming**: Converts "Location, Date" folder names into "YYYY-MM-DD, Location" format.
-- **Localization Support**: Handles various date formats based on your preferred locale (e.g., `de`, `en`).
-- **Unicode Resilience**: Robustly handles Mac's canonical decomposition (NFD) for special characters like German umlauts.
-- **Safety First**: Optional source deletion—keeps your original files safe by default.
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- **Java 25** or higher
-- **Maven** (for building)
-
-### Installation
-
-Clone the repository and build the project using Maven:
-
-```bash
-git clone https://github.com/thtesche/photosexportsortcli.git
-cd photosexportsortcli
-mvn clean package
-```
-
-This will generate a `jar-with-dependencies` in the `target` directory.
-
-## 🛠 Usage
-
-Run the tool using the following command structure:
-
-```bash
-java -jar target/sortcli-1.0-SNAPSHOT-jar-with-dependencies.jar \
-  --sourceRoot /path/to/photos/export \
-  --targetRoot /path/to/destination \
-  --locale de \
-  --deleteSource
-```
-
-### Options
-
-| Option | Description |
-| :--- | :--- |
-| `--sourceRoot` | The root folder containing the Mac Photos app export. |
-| `--targetRoot` | The destination folder for the reorganized structure. |
-| `--locale` | Locale for date parsing (e.g., `de`, `en`, `fr`). |
-| `--deleteSource` | (Optional) If specified, deletes the source folders after copying. |
-| `--help` | Display help information and exit. |
-
-## 📁 Transformation Example
-
-**Before:**
-```text
-Photos Export/
-├── Berlin, 15. März 2024/
-└── 20. April 2024/
-```
-
-**After (Locale: `de`):**
-```text
-Sorted Photos/
-└── 2024/
-    ├── 2024-03-15, Berlin/
-    └── 2024-04-20/
-```
-
-## ⚖️ License
-
-Distributed under the MIT License. See `LICENSE` for more information.
+It offers two primary functions:
+1. **Sort:** Reorganizes messy export directories into a clean, chronological structure (`YYYY/YYYY-MM-DD, Location`).
+2. **Tag:** Uses a local LLM (Ollama) to automatically extract descriptive keywords from file paths and writes them as EXIF tags to the images using `exiftool`.
 
 ---
-*Created with ❤️ for organized memories.*
+
+## 🛠 Prerequisites
+
+To run and build this project, you need:
+*   **Java 25** (e.g., Eclipse Temurin 25)
+*   **Ollama** (Running locally on `localhost:11434` with a model like `gemma4`) - *Required for the `tag` command*
+*   **exiftool** (e.g., `brew install exiftool`) - *Required for the `tag` command*
+
+---
+
+## 🚀 Quick Start & Usage
+
+### 1. Build the project
+Thanks to the included Maven Wrapper, you don't need to install Maven. Just run:
+```bash
+./mvnw clean package
+```
+
+### 2. Verify Installation (Doctor)
+Check if Ollama and exiftool are correctly installed and reachable:
+```bash
+java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar doctor
+```
+
+### 3. Sort Photos
+Reorganize your exported photos. 
+
+**Example:**
+```bash
+java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar sort \
+  --sourceRoot=/path/to/apple/export \
+  --targetRoot=/path/to/clean/structure \
+  --locale=de
+```
+This will transform `Berlin, 15. März 2024` into `2024/2024-03-15, Berlin`.
+
+### 4. Auto-Tag Photos (AI powered)
+Scan a directory and let Ollama automatically generate semantic tags based on the folder/file names, writing them to the EXIF data.
+
+**Example (Dry Run - just see the tags, don't write, and ignore specific words):**
+```bash
+java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar tag \
+  --directory=/path/to/photos \
+  --model=gemma4 \
+  --ignore="Backup,Urlaub,Fotos" \
+  --dryRun
+```
+
+**Example (Actually write tags):**
+```bash
+java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar tag \
+  --directory=/path/to/photos
+```
+
+---
+
+## 🤝 Contributing
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

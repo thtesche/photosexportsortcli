@@ -29,12 +29,12 @@ jobs:
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: sortcli-binary
-        path: target/sortcli-1.0-SNAPSHOT-jar-with-dependencies.jar
+        name: macfotocli-binary
+        path: target/macfotocli-*-jar-with-dependencies.jar
 
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
-        files: target/sortcli-1.0-SNAPSHOT-jar-with-dependencies.jar
+        files: target/macfotocli-*-jar-with-dependencies.jar
         generate_release_notes: true
