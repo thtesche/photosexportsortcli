@@ -19,15 +19,26 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
-@Command(name = "sortcli", mixinStandardHelpOptions = true, version = "sortcli 0.1",
-        description = "Sorts export structur (directories of mac's photos app")
+@Command(name = "sortcli", mixinStandardHelpOptions = true, version = "sortcli 1.0",
+        description = "Reorganizes Apple Photos exports into a clean, chronological structure.",
+        header = {
+                "@|bold,cyan  ____  _           _            ____             _      ____ _     ___ |@",
+                "@|bold,cyan |  _ \\| |__   ___ | |_ ___     / ___|  ___  _ __| |_   / ___| |   |_ _||@",
+                "@|bold,cyan | |_) | '_ \\ / _ \\| __/ _ \\    \\___ \\ / _ \\| '__| __| | |   | |    | | |@",
+                "@|bold,cyan |  __/| | | | (_) | || (_) |    ___) | (_) | |  | |_  | |___| |___ | | |@",
+                "@|bold,cyan |_|   |_| |_|\\___/ \\__\\___/    |____/ \\___/|_|   \\__|  \\____|_____|___||@",
+                ""
+        })
 class SortCli implements Callable<Integer> {
+
+    @CommandLine.Spec
+    CommandLine.Model.CommandSpec spec;
 
     @Option(names = "--sourceRoot", description = "source folder with mac photos app export")
     private File source;
 
     @Option(names = "--targetRoot", description = "target folder for transformed directory structure")
-    private File target;
+    File target;
 
     @Option(names = "--locale", description = "Locale to transform the date e.g. en, de ...")
     private String locale;
@@ -42,10 +53,26 @@ class SortCli implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
+        if (source == null || !source.exists() || !source.isDirectory()) {
+            spec.commandLine().getErr().println("@|red Error: Source root must be a valid directory.|@");
+            return 1;
+        }
+
+        if (target == null) {
+            spec.commandLine().getErr().println("@|red Error: Target root must be specified.|@");
+            return 1;
+        }
+
+        spec.commandLine().getOut().println("@|yellow Sorting photos from:|@ " + source.getAbsolutePath());
+        spec.commandLine().getOut().println("@|yellow Target directory:|@   " + target.getAbsolutePath());
+        spec.commandLine().getOut().println();
+
         Set<String> dirsInDir = listDirsUsingFilesList(source.getAbsolutePath());
         dirsInDir.forEach(dir -> {
             try {
                 PathInfo pathInfo = createTargetDirs(re_sort_location_date(dir, locale));
+                spec.commandLine().getOut().println("@|green Processing:|@ " + Path.of(pathInfo.sourceDir()).getFileName());
+                
                 FileUtils.copyDirectory(new File(pathInfo.sourceDir()), new File(pathInfo.targetDir()));
                 if (deleteSource) {
                     FileUtils.deleteQuietly(new File(pathInfo.sourceDir()));
@@ -55,32 +82,32 @@ class SortCli implements Callable<Integer> {
             }
         });
 
+        spec.commandLine().getOut().println();
+        spec.commandLine().getOut().println("@|bold,green Success! Photos have been reorganized.|@");
         return 0;
     }
 
     private PathInfo createTargetDirs(PathInfo pathInfo) throws IOException {
-        Path path = Paths.get(pathInfo.targetDir());
-        Path newTargetDir = Files.createDirectories(path);
-        System.out.println(newTargetDir.toString());
+        Path path = Path.of(pathInfo.targetDir());
+        Files.createDirectories(path);
         return pathInfo;
     }
 
     private Set<String> listDirsUsingFilesList(String dir) throws IOException {
-        try (Stream<Path> stream = Files.list(Paths.get(dir))) {
+        try (Stream<Path> stream = Files.list(Path.of(dir))) {
             return stream
-                    .filter(file -> Files.isDirectory(file))
+                    .filter(Files::isDirectory)
                     .map(Path::toAbsolutePath)
                     .map(Path::toString)
                     .collect(Collectors.toSet());
         }
-
     }
 
-    private PathInfo re_sort_location_date(String dir, String locale) {
+    PathInfo re_sort_location_date(String dir, String locale) {
 
         String[] dirParts = dir.split("/");
 
-        String fileNameParts[] = dirParts[dirParts.length - 1].split(",");
+        String fileNameParts[] = dirParts[dirParts.length - 1].split(",", 2);
         String reSortedDirName = "";
 
         String datePart;
@@ -103,11 +130,10 @@ class SortCli implements Callable<Integer> {
 
         String outDateString = DateTimeFormatter.ISO_DATE.format(inDate);
 
-        return new PathInfo(dir, Paths.get(target.getAbsolutePath(), Integer.toString(inDate.getYear()), outDateString + reSortedDirName).toString());
-
+        return new PathInfo(dir, Path.of(target.getAbsolutePath(), Integer.toString(inDate.getYear()), outDateString + reSortedDirName).toString());
     }
 
-    private record PathInfo(String sourceDir, String targetDir) {
+    record PathInfo(String sourceDir, String targetDir) {
         @Override
         public String toString() {
             return "sourceDir= " + sourceDir + ", targetDir=" + targetDir;
