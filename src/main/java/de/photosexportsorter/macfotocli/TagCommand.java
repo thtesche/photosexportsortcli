@@ -178,7 +178,7 @@ public class TagCommand implements Callable<Integer> {
         command.add("-overwrite_original");
 
         for (String tag : tags) {
-            command.add("-keywords=" + tag);
+            command.add("-keywords+=" + tag);
         }
         command.add(imagePath.toAbsolutePath().toString());
 
