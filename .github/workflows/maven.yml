@@ -3,13 +3,15 @@ name: Java CI with Maven
 on:
   push:
     branches: [ "main" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
     - uses: actions/checkout@v4
@@ -29,3 +31,10 @@ jobs:
       with:
         name: sortcli-binary
         path: target/sortcli-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: target/sortcli-1.0-SNAPSHOT-jar-with-dependencies.jar
+        generate_release_notes: true
