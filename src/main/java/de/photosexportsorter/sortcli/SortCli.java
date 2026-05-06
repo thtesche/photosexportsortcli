@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
@@ -19,16 +18,14 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
-@Command(name = "sortcli", mixinStandardHelpOptions = true, version = "sortcli 1.0",
-        description = "Reorganizes Apple Photos exports into a clean, chronological structure.",
-        header = {
-                "@|bold,cyan  ____  _           _            ____             _      ____ _     ___ |@",
-                "@|bold,cyan |  _ \\| |__   ___ | |_ ___     / ___|  ___  _ __| |_   / ___| |   |_ _||@",
-                "@|bold,cyan | |_) | '_ \\ / _ \\| __/ _ \\    \\___ \\ / _ \\| '__| __| | |   | |    | | |@",
-                "@|bold,cyan |  __/| | | | (_) | || (_) |    ___) | (_) | |  | |_  | |___| |___ | | |@",
-                "@|bold,cyan |_|   |_| |_|\\___/ \\__\\___/    |____/ \\___/|_|   \\__|  \\____|_____|___||@",
-                ""
-        })
+@Command(name = "sortcli", mixinStandardHelpOptions = true, version = "sortcli 1.0", description = "Reorganizes Apple Photos exports into a clean, chronological structure.", header = {
+        "@|bold,cyan  ____  _           _            ____             _      ____ _     ___ |@",
+        "@|bold,cyan |  _ \\| |__   ___ | |_ ___     / ___|  ___  _ __| |_   / ___| |   |_ _||@",
+        "@|bold,cyan | |_) | '_ \\ / _ \\| __/ _ \\    \\___ \\ / _ \\| '__| __| | |   | |    | | |@",
+        "@|bold,cyan |  __/| | | | (_) | || (_) |    ___) | (_) | |  | |_  | |___| |___ | | |@",
+        "@|bold,cyan |_|   |_| |_|\\___/ \\__\\___/    |____/ \\___/|_|   \\__|  \\____|_____|___||@",
+        ""
+})
 class SortCli implements Callable<Integer> {
 
     @CommandLine.Spec
@@ -71,8 +68,9 @@ class SortCli implements Callable<Integer> {
         dirsInDir.forEach(dir -> {
             try {
                 PathInfo pathInfo = createTargetDirs(re_sort_location_date(dir, locale));
-                spec.commandLine().getOut().println("@|green Processing:|@ " + Path.of(pathInfo.sourceDir()).getFileName());
-                
+                spec.commandLine().getOut()
+                        .println("@|green Processing:|@ " + Path.of(pathInfo.sourceDir()).getFileName());
+
                 FileUtils.copyDirectory(new File(pathInfo.sourceDir()), new File(pathInfo.targetDir()));
                 if (deleteSource) {
                     FileUtils.deleteQuietly(new File(pathInfo.sourceDir()));
@@ -121,16 +119,21 @@ class SortCli implements Callable<Integer> {
 
         // Replacement for macs canonical decomposition
         // https://developer.apple.com/library/archive/technotes/tn/tn1150.html#UnicodeSubtleties
-        // In Germany there is only the March (März) which is affected. More replacements needs
+        // In Germany there is only the March (März) which is affected. More
+        // replacements needs
         // to be added for other locales.
-        // As the output date is an ISO date there are no longer non iso chars existent at this stage. 
+        // As the output date is an ISO date there are no longer non iso chars existent
+        // at this stage.
         String newDatePart = datePart.replace("ä", "ä");
 
-        LocalDate inDate = LocalDate.parse(newDatePart, DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(new Locale(locale)));
+        LocalDate inDate = LocalDate.parse(newDatePart,
+                DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(new Locale(locale)));
 
         String outDateString = DateTimeFormatter.ISO_DATE.format(inDate);
 
-        return new PathInfo(dir, Path.of(target.getAbsolutePath(), Integer.toString(inDate.getYear()), outDateString + reSortedDirName).toString());
+        return new PathInfo(dir,
+                Path.of(target.getAbsolutePath(), Integer.toString(inDate.getYear()), outDateString + reSortedDirName)
+                        .toString());
     }
 
     record PathInfo(String sourceDir, String targetDir) {
