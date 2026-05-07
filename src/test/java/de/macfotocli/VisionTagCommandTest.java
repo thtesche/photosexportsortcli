@@ -1,7 +1,6 @@
-package de.photosexportsorter.macfotocli;
+package de.macfotocli;
 
 import org.junit.jupiter.api.Test;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 

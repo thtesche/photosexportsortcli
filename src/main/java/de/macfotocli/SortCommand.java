@@ -1,4 +1,4 @@
-package de.photosexportsorter.macfotocli;
+package de.macfotocli;
 
 import java.io.File;
 import java.io.IOException;

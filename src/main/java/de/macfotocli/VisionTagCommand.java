@@ -1,4 +1,4 @@
-package de.photosexportsorter.macfotocli;
+package de.macfotocli;
 
 import java.io.File;
 import java.io.IOException;
@@ -14,11 +14,9 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.fasterxml.jackson.databind.JsonNode;

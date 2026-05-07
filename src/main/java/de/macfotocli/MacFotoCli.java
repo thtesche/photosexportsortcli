@@ -1,4 +1,4 @@
-package de.photosexportsorter.macfotocli;
+package de.macfotocli;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
