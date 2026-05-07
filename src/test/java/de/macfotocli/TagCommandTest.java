@@ -106,6 +106,7 @@ class TagCommandTest {
 
         // Ignored prefixes
         assertFalse(TagCommand.hasWords("IMG_1234.jpg"));
+        assertFalse(TagCommand.hasWords("2024/IMG_1234_HDR.jpg"));
         assertFalse(TagCommand.hasWords("DSC_0001.JPG"));
         assertFalse(TagCommand.hasWords("2024/WP_12345.jpg"));
         assertFalse(TagCommand.hasWords("Screenshot_2024-05-01.png"));
