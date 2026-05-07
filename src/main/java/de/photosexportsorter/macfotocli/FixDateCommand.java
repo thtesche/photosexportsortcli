@@ -182,7 +182,7 @@ public class FixDateCommand implements Callable<Integer> {
         }
         Process process = pb.start();
         String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
-        int exitCode = process.waitFor();
+        process.waitFor();
         
         if (output.startsWith("[")) {
             JsonNode root = mapper.readTree(output);
