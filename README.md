@@ -58,16 +58,16 @@ Scan a directory and let Ollama automatically generate semantic tags based on th
 **Example (Dry Run - just see the tags, don't write, and ignore specific words):**
 ```bash
 java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar tag \
-  --directory=/path/to/photos \
   --model=gemma4 \
   --ignore="Backup,Urlaub,Fotos" \
-  --dryRun
+  --dryRun \
+  /path/to/photos
 ```
 
-**Example (Actually write tags):**
+**Example (Actually write tags for multiple directories using shell wildcards):**
 ```bash
 java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar tag \
-  --directory=/path/to/photos
+  /path/to/200*
 ```
 
 ---

@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Help.Ansi;
 
 @Command(name = "tag", description = "Automatically generate and write EXIF keywords using local Ollama model based on filepath.")
@@ -31,8 +32,8 @@ public class TagCommand implements Callable<Integer> {
     @CommandLine.Spec
     CommandLine.Model.CommandSpec spec;
 
-    @Option(names = "--directory", required = true, description = "Directory containing photos to tag")
-    private File directory;
+    @Parameters(arity = "0..*", description = "Directories containing photos to tag (supports wildcards like /200*)")
+    private List<File> directories = new ArrayList<>();
 
     @Option(names = "--model", description = "Ollama model to use (default: gemma4)", defaultValue = "gemma4")
     private String model;
@@ -50,23 +51,36 @@ public class TagCommand implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-        if (!directory.exists() || !directory.isDirectory()) {
-            spec.commandLine().getErr().println(Ansi.AUTO.string("@|red Error: Target must be a valid directory.|@"));
+        List<File> dirsToProcess = new ArrayList<>();
+        if (directories != null) {
+            dirsToProcess.addAll(directories);
+        }
+
+        if (dirsToProcess.isEmpty()) {
+            spec.commandLine().getErr().println(Ansi.AUTO.string("@|red Error: No directories specified. You must provide at least one directory.|@"));
             return 1;
         }
 
-        spec.commandLine().getOut().println(Ansi.AUTO.string("@|yellow Scanning directory:|@ " + directory.getAbsolutePath()));
         if (dryRun) {
             spec.commandLine().getOut().println(Ansi.AUTO.string("@|bold,yellow [DRY RUN ENABLED - No files will be modified]|@\n"));
         }
 
-        try (Stream<Path> stream = Files.walk(directory.toPath())) {
-            stream.filter(Files::isRegularFile)
-                    .filter(this::isImageFile)
-                    .forEach(this::processFile);
+        for (File dir : dirsToProcess) {
+            if (!dir.exists() || !dir.isDirectory()) {
+                spec.commandLine().getErr().println(Ansi.AUTO.string("@|yellow Warning: Skipping invalid directory:|@ " + dir.getAbsolutePath()));
+                continue;
+            }
+
+            spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|yellow Scanning directory:|@ " + dir.getAbsolutePath()));
+
+            try (Stream<Path> stream = Files.walk(dir.toPath())) {
+                stream.filter(Files::isRegularFile)
+                        .filter(this::isImageFile)
+                        .forEach(path -> processFile(path, dir));
+            }
         }
 
-        spec.commandLine().getOut().println(Ansi.AUTO.string("@|bold,green Tagging complete.|@"));
+        spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|bold,green Tagging complete.|@"));
         return 0;
     }
 
@@ -79,8 +93,8 @@ public class TagCommand implements Callable<Integer> {
         return name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".heic");
     }
 
-    private void processFile(Path path) {
-        String relativePath = directory.toPath().relativize(path).toString();
+    private void processFile(Path path, File rootDirectory) {
+        String relativePath = rootDirectory.toPath().relativize(path).toString();
         spec.commandLine().getOut().print(Ansi.AUTO.string("@|cyan Analyzing:|@ " + relativePath + " ... "));
         try {
             List<String> generatedTags = getTagsFromOllama(relativePath);
