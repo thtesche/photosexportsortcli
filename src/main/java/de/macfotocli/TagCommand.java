@@ -112,12 +112,20 @@ public class TagCommand implements Callable<Integer> {
         spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string("@|cyan Analyzing:|@ " + fullPath));
         spec.commandLine().getOut().flush();
 
+        // Optimization: check if there are any descriptive words in the path (excluding extension)
+        if (!hasWords(relativePath)) {
+            spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string("@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (No descriptive words in path)"));
+            spec.commandLine().getOut().flush();
+            return;
+        }
+
         try {
             ExifMetadata metadata = getExifMetadata(path);
 
             // Skip if already tagged with Pro-Prompt and not forced
             if (!force && metadata.instructions != null && metadata.instructions.contains("Gemma4-Pro-Prompt")) {
-                spec.commandLine().getOut().println("\r\033[K" + Ansi.AUTO.string("@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (Already tagged with Pro-Prompt)"));
+                spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string("@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (Already tagged with Pro-Prompt)"));
+                spec.commandLine().getOut().flush();
                 return;
             }
 
@@ -301,6 +309,31 @@ public class TagCommand implements Callable<Integer> {
             }
         }
         return tagsToAdd;
+    }
+
+    private static final Set<String> IGNORED_WORDS = Set.of(
+        "IMG", "DSC", "PANO", "VID", "SCAN", "WP", "P", "SCREENSHOT", "SCREEN", "RECORDING"
+    );
+
+    public static boolean hasWords(String relativePath) {
+        String pathWithoutExtension = relativePath;
+        int lastDot = relativePath.lastIndexOf('.');
+        if (lastDot > 0) {
+            pathWithoutExtension = relativePath.substring(0, lastDot);
+        }
+
+        // Split by non-letter characters (including numbers, underscores, etc.)
+        // Supports German umlauts and ß
+        String[] parts = pathWithoutExtension.split("[^a-zA-ZäöüÄÖÜß]+");
+        
+        for (String part : parts) {
+            if (part.length() < 3) continue; // Skip single/double letters like 'P' or 'WP'
+            if (IGNORED_WORDS.contains(part.toUpperCase())) continue;
+            
+            // If we found a word that is at least 3 chars long and not in the blacklist
+            return true;
+        }
+        return false;
     }
 
     public static List<String> mergeTags(List<String> existingTags, List<String> generatedTags) {

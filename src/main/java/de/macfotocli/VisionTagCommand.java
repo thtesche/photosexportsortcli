@@ -109,7 +109,8 @@ public class VisionTagCommand implements Callable<Integer> {
             ExifMetadata metadata = getExifMetadata(path);
 
             if (!force && metadata.instructions != null && metadata.instructions.contains(PRO_MARKER)) {
-                spec.commandLine().getOut().println("\r\033[K" + Ansi.AUTO.string("@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (Already tagged with Pro-Prompt)"));
+                spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string("@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (Already tagged with Pro-Prompt)"));
+                spec.commandLine().getOut().flush();
                 return;
             }
 
