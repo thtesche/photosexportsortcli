@@ -8,6 +8,7 @@ import picocli.CommandLine.Command;
         subcommands = {
                 SortCommand.class,
                 TagCommand.class,
+                FixDateCommand.class,
                 DoctorCommand.class
         })
 public class MacFotoCli implements Runnable {

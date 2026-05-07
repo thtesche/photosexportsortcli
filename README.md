@@ -70,6 +70,27 @@ java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar tag \
   /path/to/200*
 ```
 
+### 5. Fix Dates
+Some images may lack EXIF dates but have them encoded in their folder structure (e.g. `YYYY-MM-DD`). The `fixdate` command scans directories, extracts the expected date from the directory path, and verifies it against the image's EXIF `DateTimeOriginal`. If missing or mismatched, it updates the EXIF metadata to match the folder structure.
+
+**✨ Key Features:**
+* **Non-destructive Time:** Existing valid times (e.g., `13:45:00`) are preserved if only the date part is wrong.
+* **Safe Defaults:** If no time was present at all, a default of `12:00:00` is used.
+* **Dry Run Support:** You can simulate the process first without modifying files.
+
+**Example (Dry Run):**
+```bash
+java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar fixdate \
+  --dryRun \
+  /path/to/200*
+```
+
+**Example (Actually write dates):**
+```bash
+java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar fixdate \
+  /path/to/200*
+```
+
 ---
 
 ## 🤝 Contributing

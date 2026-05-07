@@ -90,16 +90,26 @@ public class TagCommand implements Callable<Integer> {
             return false;
         }
         name = name.toLowerCase();
-        return name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".heic");
+        return name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".heic") ||
+               name.endsWith(".mp4") || name.endsWith(".mov") || name.endsWith(".m4v") || name.endsWith(".avi");
+    }
+
+    private boolean isVideoFile(Path path) {
+        String name = path.getFileName().toString().toLowerCase();
+        return name.endsWith(".mp4") || name.endsWith(".mov") || name.endsWith(".m4v") || name.endsWith(".avi");
     }
 
     private void processFile(Path path, File rootDirectory) {
+        String fullPath = path.toAbsolutePath().toString();
         String relativePath = rootDirectory.toPath().relativize(path).toString();
-        spec.commandLine().getOut().print(Ansi.AUTO.string("@|cyan Analyzing:|@ " + relativePath + " ... "));
+        
+        spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string("@|cyan Analyzing:|@ " + fullPath));
+        spec.commandLine().getOut().flush();
+
         try {
             List<String> generatedTags = getTagsFromOllama(relativePath);
             if (generatedTags == null || generatedTags.isEmpty()) {
-                spec.commandLine().getOut().println(Ansi.AUTO.string("@|yellow [No tags extracted]|@"));
+                // No tags -> do not print, next file will overwrite
                 return;
             }
 
@@ -107,11 +117,11 @@ public class TagCommand implements Callable<Integer> {
             List<String> tagsToAdd = filterNewTags(existingTags, generatedTags);
 
             if (tagsToAdd.isEmpty()) {
-                spec.commandLine().getOut().println(Ansi.AUTO.string("@|yellow [All tags already exist, skipped]|@"));
+                // All tags already exist -> do not print, next file will overwrite
                 return;
             }
 
-            spec.commandLine().getOut().print(Ansi.AUTO.string("@|green Tags:|@ " + tagsToAdd + " ... "));
+            spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string("@|cyan Analyzing:|@ " + fullPath + " | @|green Tags:|@ " + tagsToAdd + " ... "));
 
             if (dryRun) {
                 spec.commandLine().getOut().println(Ansi.AUTO.string("@|yellow [Skipped writing]|@"));
@@ -122,7 +132,7 @@ public class TagCommand implements Callable<Integer> {
 
         } catch (Exception e) {
             String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-            spec.commandLine().getOut().println(Ansi.AUTO.string("@|red [ERROR: " + msg + "]|@"));
+            spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|red [ERROR: " + msg + "]|@"));
         }
     }
 
@@ -253,8 +263,14 @@ public class TagCommand implements Callable<Integer> {
         command.add("exiftool");
         command.add("-overwrite_original");
 
+        boolean isVideo = isVideoFile(imagePath);
+
         for (String tag : tags) {
             command.add("-keywords+=" + tag);
+            if (isVideo) {
+                command.add("-Keys:Keywords+=" + tag);
+                command.add("-ItemList:Keyword+=" + tag);
+            }
         }
         command.add(imagePath.toAbsolutePath().toString());
 
