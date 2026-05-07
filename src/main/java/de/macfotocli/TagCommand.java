@@ -44,7 +44,7 @@ public class TagCommand implements Callable<Integer> {
     @Option(names = "--dryRun", description = "If set, only queries Ollama but does NOT write to the files via exiftool")
     private boolean dryRun = false;
 
-    @Option(names = {"-f", "--force"}, description = "Force re-tagging even if the image is already AI-tagged")
+    @Option(names = { "-f", "--force" }, description = "Force re-tagging even if the image is already AI-tagged")
     private boolean force = false;
 
     @Option(names = "--ignore", description = "Comma-separated list of negative words to ignore (e.g. 'Backup,Urlaub')")
@@ -63,21 +63,25 @@ public class TagCommand implements Callable<Integer> {
         }
 
         if (dirsToProcess.isEmpty()) {
-            spec.commandLine().getErr().println(Ansi.AUTO.string("@|red Error: No directories specified. You must provide at least one directory.|@"));
+            spec.commandLine().getErr().println(Ansi.AUTO
+                    .string("@|red Error: No directories specified. You must provide at least one directory.|@"));
             return 1;
         }
 
         if (dryRun) {
-            spec.commandLine().getOut().println(Ansi.AUTO.string("@|bold,yellow [DRY RUN ENABLED - No files will be modified]|@\n"));
+            spec.commandLine().getOut()
+                    .println(Ansi.AUTO.string("@|bold,yellow [DRY RUN ENABLED - No files will be modified]|@\n"));
         }
 
         for (File dir : dirsToProcess) {
             if (!dir.exists() || !dir.isDirectory()) {
-                spec.commandLine().getErr().println(Ansi.AUTO.string("@|yellow Warning: Skipping invalid directory:|@ " + dir.getAbsolutePath()));
+                spec.commandLine().getErr().println(
+                        Ansi.AUTO.string("@|yellow Warning: Skipping invalid directory:|@ " + dir.getAbsolutePath()));
                 continue;
             }
 
-            spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|yellow Scanning directory:|@ " + dir.getAbsolutePath()));
+            spec.commandLine().getOut()
+                    .println(Ansi.AUTO.string("\n@|yellow Scanning directory:|@ " + dir.getAbsolutePath()));
 
             try (Stream<Path> stream = Files.walk(dir.toPath())) {
                 stream.filter(Files::isRegularFile)
@@ -97,7 +101,7 @@ public class TagCommand implements Callable<Integer> {
         }
         name = name.toLowerCase();
         return name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".heic") ||
-               name.endsWith(".mp4") || name.endsWith(".mov") || name.endsWith(".m4v") || name.endsWith(".avi");
+                name.endsWith(".mp4") || name.endsWith(".mov") || name.endsWith(".m4v") || name.endsWith(".avi");
     }
 
     private boolean isVideoFile(Path path) {
@@ -108,13 +112,15 @@ public class TagCommand implements Callable<Integer> {
     private void processFile(Path path, File rootDirectory) {
         String fullPath = path.toAbsolutePath().toString();
         String relativePath = rootDirectory.toPath().relativize(path).toString();
-        
+
         spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string("@|cyan Analyzing:|@ " + fullPath));
         spec.commandLine().getOut().flush();
 
-        // Optimization: check if there are any descriptive words in the path (excluding extension)
+        // Optimization: check if there are any descriptive words in the path (excluding
+        // extension)
         if (!hasWords(relativePath)) {
-            spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string("@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (No descriptive words in path)"));
+            spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO
+                    .string("@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (No descriptive words in path)"));
             spec.commandLine().getOut().flush();
             return;
         }
@@ -124,7 +130,8 @@ public class TagCommand implements Callable<Integer> {
 
             // Skip if already tagged with Pro-Prompt and not forced
             if (!force && metadata.instructions != null && metadata.instructions.contains("Gemma4-Pro-Prompt")) {
-                spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string("@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (Already tagged with Pro-Prompt)"));
+                spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string(
+                        "@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (Already tagged with Pro-Prompt)"));
                 spec.commandLine().getOut().flush();
                 return;
             }
@@ -138,14 +145,16 @@ public class TagCommand implements Callable<Integer> {
             List<String> tagsToAdd = filterNewTags(metadata.keywords, generatedTags);
 
             if (!force && tagsToAdd.isEmpty() && metadata.alreadySynced) {
-                // All tags already exist and are synced -> do not print, next file will overwrite
+                // All tags already exist and are synced -> do not print, next file will
+                // overwrite
                 return;
             }
 
             // Aggregate all tags: existing (union) + new from AI
             List<String> finalTags = mergeTags(metadata.keywords, generatedTags);
 
-            spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string("@|cyan Analyzing:|@ " + fullPath + " | @|green Tags:|@ " + tagsToAdd + " ... "));
+            spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO
+                    .string("@|cyan Analyzing:|@ " + fullPath + " | @|green Tags:|@ " + tagsToAdd + " ... "));
 
             if (dryRun) {
                 spec.commandLine().getOut().println(Ansi.AUTO.string("@|yellow [Skipped writing]|@"));
@@ -169,7 +178,7 @@ public class TagCommand implements Callable<Integer> {
                 .append("- Split CamelCase words into separate words (e.g., 'SummerVacation' -> 'Summer', 'Vacation').\n")
                 .append("- DO NOT include years, dates, or times (e.g. 2019, 2019-09-15, October 12).\n")
                 .append("- DO NOT include numbers.\n")
-                .append("- DO NOT include generic terms like 'IMG', 'HDR'export', 'source', 'Backup', 'Volumes', 'file', 'photo', 'random', 'id'.\n")
+                .append("- DO NOT include generic terms like 'BURST', 'COVER', 'TOP', 'IMG', 'HDR', 'export', 'source', 'Backup', 'Volumes', 'file', 'photo', 'random', 'id'.\n")
                 .append("- DO NOT include file extensions (like jpg, jpeg, png).\n")
                 .append("- Ignore any UUIDs, hashes, or random strings in the path, but STILL extract valid words from the rest of the path (like the folder name).\n")
                 .append("- If no valid words are found in the entire path, return []. DO NOT hallucinate words.\n");
@@ -237,7 +246,8 @@ public class TagCommand implements Callable<Integer> {
     }
 
     private ExifMetadata getExifMetadata(Path imagePath) throws IOException, InterruptedException {
-        Process process = new ProcessBuilder("exiftool", "-XMP:Instructions", "-keywords", "-Subject", "-j", imagePath.toAbsolutePath().toString()).start();
+        Process process = new ProcessBuilder("exiftool", "-XMP:Instructions", "-keywords", "-Subject", "-j",
+                imagePath.toAbsolutePath().toString()).start();
         String json = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         process.waitFor();
 
@@ -250,7 +260,7 @@ public class TagCommand implements Callable<Integer> {
             JsonNode root = mapper.readTree(json);
             if (root.isArray() && root.size() > 0) {
                 JsonNode fileNode = root.get(0);
-                
+
                 JsonNode instructionsNode = fileNode.get("Instructions");
                 if (instructionsNode != null) {
                     metadata.instructions = instructionsNode.asText();
@@ -265,7 +275,7 @@ public class TagCommand implements Callable<Integer> {
                         kwSet.add(keywordsNode.asText());
                     }
                 }
-                
+
                 Set<String> subSet = new HashSet<>();
                 JsonNode subjectNode = fileNode.get("Subject");
                 if (subjectNode != null) {
@@ -275,7 +285,7 @@ public class TagCommand implements Callable<Integer> {
                         subSet.add(subjectNode.asText());
                     }
                 }
-                
+
                 metadata.alreadySynced = kwSet.equals(subSet);
                 metadata.keywords.addAll(kwSet);
                 for (String s : subSet) {
@@ -312,8 +322,8 @@ public class TagCommand implements Callable<Integer> {
     }
 
     private static final Set<String> IGNORED_WORDS = Set.of(
-        "IMG", "DSC", "PANO", "VID", "SCAN", "WP", "P", "SCREENSHOT", "SCREEN", "RECORDING"
-    );
+            "IMG", "DSC", "PANO", "VID", "SCAN", "WP", "P", "SCREENSHOT", "SCREEN", "RECORDING", "HDR", "BURST",
+            "COVER", "TOP");
 
     public static boolean hasWords(String relativePath) {
         String pathWithoutExtension = relativePath;
@@ -325,11 +335,13 @@ public class TagCommand implements Callable<Integer> {
         // Split by non-letter characters (including numbers, underscores, etc.)
         // Supports German umlauts and ß
         String[] parts = pathWithoutExtension.split("[^a-zA-ZäöüÄÖÜß]+");
-        
+
         for (String part : parts) {
-            if (part.length() < 3) continue; // Skip single/double letters like 'P' or 'WP'
-            if (IGNORED_WORDS.contains(part.toUpperCase())) continue;
-            
+            if (part.length() < 3)
+                continue; // Skip single/double letters like 'P' or 'WP'
+            if (IGNORED_WORDS.contains(part.toUpperCase()))
+                continue;
+
             // If we found a word that is at least 3 chars long and not in the blacklist
             return true;
         }

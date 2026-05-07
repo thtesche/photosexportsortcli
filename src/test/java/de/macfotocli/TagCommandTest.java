@@ -110,6 +110,9 @@ class TagCommandTest {
         assertFalse(TagCommand.hasWords("DSC_0001.JPG"));
         assertFalse(TagCommand.hasWords("2024/WP_12345.jpg"));
         assertFalse(TagCommand.hasWords("Screenshot_2024-05-01.png"));
+        assertFalse(TagCommand.hasWords("BURST_20240501.jpg"));
+        assertFalse(TagCommand.hasWords("COVER_001.jpg"));
+        assertFalse(TagCommand.hasWords("2024/TOP_999.jpg"));
 
         // Too short
         assertFalse(TagCommand.hasWords("P/123.jpg"));
