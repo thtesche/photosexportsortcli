@@ -50,6 +50,11 @@ This will transform `Berlin, 15. März 2024` into `2024/2024-03-15, Berlin`.
 ### 4. Auto-Tag Photos (AI powered)
 Scan a directory and let Ollama automatically generate semantic tags based on the folder/file names, writing them to the EXIF data.
 
+**✨ Smart Tag Management:**
+* **Non-destructive:** Existing EXIF keywords are fully preserved.
+* **Smart Deduplication:** New tags are only written if they do not already exist in the file.
+* **Case-Insensitive:** Prevents duplicate variations like `Berlin` and `berlin`.
+
 **Example (Dry Run - just see the tags, don't write, and ignore specific words):**
 ```bash
 java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar tag \
