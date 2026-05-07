@@ -93,6 +93,15 @@ java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar fixdate \
 
 ---
 
+## 🏷️ Releasing
+To create a new release, bump the version in `pom.xml`, and create a Git tag, simply run the interactive release script:
+```bash
+./release.sh
+```
+It will guide you through setting the release version and the next development snapshot version.
+
+---
+
 ## 🤝 Contributing
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
