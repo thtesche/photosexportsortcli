@@ -1,6 +1,6 @@
 # MacFotoCli 📸🚀
 
-[![Java CI with Maven](https://github.com/thtesche/photosexportsortcli/actions/workflows/maven.yml/badge.svg)](https://github.com/thtesche/photosexportsortcli/actions/workflows/maven.yml)
+[![Java CI with Maven](https://github.com/thtesche/macfotocli/actions/workflows/maven.yml/badge.svg)](https://github.com/thtesche/macfotocli/actions/workflows/maven.yml)
 [![Java Version](https://img.shields.io/badge/Java-25-blue.svg)](https://adoptium.net/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
