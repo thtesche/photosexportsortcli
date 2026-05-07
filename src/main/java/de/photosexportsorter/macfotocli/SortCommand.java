@@ -102,7 +102,7 @@ public class SortCommand implements Callable<Integer> {
         String newDatePart = datePart.replace("ä", "ä");
 
         LocalDate inDate = LocalDate.parse(newDatePart,
-                DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(Locale.of(locale)));
+                DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(Locale.forLanguageTag(locale)));
 
         String outDateString = DateTimeFormatter.ISO_DATE.format(inDate);
 

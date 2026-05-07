@@ -8,6 +8,7 @@ import picocli.CommandLine.Command;
         subcommands = {
                 SortCommand.class,
                 TagCommand.class,
+                VisionTagCommand.class,
                 FixDateCommand.class,
                 DoctorCommand.class
         })

@@ -66,4 +66,30 @@ class TagCommandTest {
         assertEquals(1, result.size());
         assertEquals("München", result.get(0));
     }
+
+    @Test
+    void testMergeTags_CombinesAndPreservesOrder() {
+        List<String> existing = Arrays.asList("Berlin", "Urlaub");
+        List<String> generated = Arrays.asList("Sommer", "Berlin", "Sonne");
+        
+        List<String> result = TagCommand.mergeTags(existing, generated);
+        
+        assertEquals(4, result.size());
+        assertEquals("Berlin", result.get(0));
+        assertEquals("Urlaub", result.get(1));
+        assertEquals("Sommer", result.get(2));
+        assertEquals("Sonne", result.get(3));
+    }
+
+    @Test
+    void testMergeTags_HandlesEmptyAndWhitespace() {
+        List<String> existing = Arrays.asList("Berlin");
+        List<String> generated = Arrays.asList("", "  München  ", null, "Berlin");
+        
+        List<String> result = TagCommand.mergeTags(existing, generated);
+        
+        assertEquals(2, result.size());
+        assertEquals("Berlin", result.get(0));
+        assertEquals("München", result.get(1));
+    }
 }

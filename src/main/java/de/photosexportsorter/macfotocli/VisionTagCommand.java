@@ -10,7 +10,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -21,6 +23,7 @@ import java.util.stream.Stream;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import picocli.CommandLine;
@@ -29,13 +32,13 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Help.Ansi;
 
-@Command(name = "tag", description = "Automatically generate and write EXIF keywords using local Ollama model based on filepath.")
-public class TagCommand implements Callable<Integer> {
+@Command(name = "visiontag", description = "Automatically generate and write EXIF keywords using local Ollama vision model based on image content.")
+public class VisionTagCommand implements Callable<Integer> {
 
     @CommandLine.Spec
     CommandLine.Model.CommandSpec spec;
 
-    @Parameters(arity = "0..*", description = "Directories containing photos to tag (supports wildcards like /200*)")
+    @Parameters(arity = "0..*", description = "Directories containing photos to tag")
     private List<File> directories = new ArrayList<>();
 
     @Option(names = "--model", description = "Ollama model to use (default: gemma4)", defaultValue = "gemma4")
@@ -47,13 +50,11 @@ public class TagCommand implements Callable<Integer> {
     @Option(names = {"-f", "--force"}, description = "Force re-tagging even if the image is already AI-tagged")
     private boolean force = false;
 
-    @Option(names = "--ignore", description = "Comma-separated list of negative words to ignore (e.g. 'Backup,Urlaub')")
-    private String ignoreWords;
-
     private static final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
     private static final ObjectMapper mapper = new ObjectMapper();
+    private static final String PRO_MARKER = "Gemma4-Pro-Prompt";
 
     @Override
     public Integer call() throws Exception {
@@ -82,62 +83,66 @@ public class TagCommand implements Callable<Integer> {
             try (Stream<Path> stream = Files.walk(dir.toPath())) {
                 stream.filter(Files::isRegularFile)
                         .filter(this::isImageFile)
-                        .forEach(path -> processFile(path, dir));
+                        .forEach(path -> processFile(path));
             }
         }
 
-        spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|bold,green Tagging complete.|@"));
+        spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|bold,green Vision tagging complete.|@"));
         return 0;
     }
 
-    private boolean isImageFile(Path path) {
+    boolean isImageFile(Path path) {
         String name = path.getFileName().toString();
-        if (name.startsWith("._")) {
+        if (name.startsWith("._") || path.toString().contains("@eaDir")) {
             return false;
         }
         name = name.toLowerCase();
-        return name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".heic") ||
-               name.endsWith(".mp4") || name.endsWith(".mov") || name.endsWith(".m4v") || name.endsWith(".avi");
+        return name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp");
     }
 
-    private boolean isVideoFile(Path path) {
-        String name = path.getFileName().toString().toLowerCase();
-        return name.endsWith(".mp4") || name.endsWith(".mov") || name.endsWith(".m4v") || name.endsWith(".avi");
-    }
-
-    private void processFile(Path path, File rootDirectory) {
+    private void processFile(Path path) {
         String fullPath = path.toAbsolutePath().toString();
-        String relativePath = rootDirectory.toPath().relativize(path).toString();
         
         spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string("@|cyan Analyzing:|@ " + fullPath));
         spec.commandLine().getOut().flush();
 
         try {
+            // Read existing metadata
             ExifMetadata metadata = getExifMetadata(path);
 
-            // Skip if already tagged with Pro-Prompt and not forced
-            if (!force && metadata.instructions != null && metadata.instructions.contains("Gemma4-Pro-Prompt")) {
+            if (!force && metadata.instructions != null && metadata.instructions.contains(PRO_MARKER)) {
                 spec.commandLine().getOut().println("\r\033[K" + Ansi.AUTO.string("@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (Already tagged with Pro-Prompt)"));
                 return;
             }
 
-            List<String> generatedTags = getTagsFromOllama(relativePath);
+            if (metadata.instructions != null && metadata.instructions.contains("AI-Tagged")) {
+                spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string("@|cyan \uD83D\uDD04 Updating:|@ " + fullPath + " with better prompt... "));
+            } else {
+                spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string("@|cyan \uD83E\uDD16 Analyzing content:|@ " + fullPath + " ... "));
+            }
+            spec.commandLine().getOut().flush();
+
+            List<String> generatedTags = getTagsFromOllama(path);
             if (generatedTags == null || generatedTags.isEmpty()) {
-                // No tags -> do not print, next file will overwrite
+                spec.commandLine().getOut().println(Ansi.AUTO.string("@|red [No tags generated]|@"));
                 return;
             }
 
-            List<String> tagsToAdd = filterNewTags(metadata.keywords, generatedTags);
+            List<String> tagsToAdd = TagCommand.filterNewTags(metadata.keywords, generatedTags);
 
-            if (!force && tagsToAdd.isEmpty() && metadata.alreadySynced) {
-                // All tags already exist and are synced -> do not print, next file will overwrite
+            if (tagsToAdd.isEmpty() && metadata.alreadySynced) {
+                spec.commandLine().getOut().println(Ansi.AUTO.string("@|green [Tags already present and synced]|@"));
+                // Still update XMP:Instructions to mark it as processed!
+                if (!dryRun) {
+                    writeInstructionsTag(path);
+                }
                 return;
             }
 
             // Aggregate all tags: existing (union) + new from AI
-            List<String> finalTags = mergeTags(metadata.keywords, generatedTags);
+            List<String> finalTags = TagCommand.mergeTags(metadata.keywords, generatedTags);
 
-            spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string("@|cyan Analyzing:|@ " + fullPath + " | @|green Tags:|@ " + tagsToAdd + " ... "));
+            spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string("@|cyan \uD83E\uDD16 Analyzing content:|@ " + fullPath + " | @|green New Tags:|@ " + tagsToAdd + " ... "));
 
             if (dryRun) {
                 spec.commandLine().getOut().println(Ansi.AUTO.string("@|yellow [Skipped writing]|@"));
@@ -148,43 +153,38 @@ public class TagCommand implements Callable<Integer> {
 
         } catch (Exception e) {
             String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-            spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|red [ERROR: " + msg + "]|@"));
+            spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|red [\u274C ERROR: " + msg + "]|@"));
         }
     }
 
-    private List<String> getTagsFromOllama(String filePath) throws IOException, InterruptedException {
-        StringBuilder promptBuilder = new StringBuilder();
-        promptBuilder.append("Extract meaningful descriptive keywords from this filepath for image tagging. ")
-                .append("Look at BOTH folder names and the file name. ")
-                .append("Extract ONLY valid semantic words (e.g. locations, objects, events, context). ")
-                .append("CRITICAL RULES:\n")
-                .append("- Split CamelCase words into separate words (e.g., 'SummerVacation' -> 'Summer', 'Vacation').\n")
-                .append("- DO NOT include years, dates, or times (e.g. 2019, 2019-09-15, October 12).\n")
-                .append("- DO NOT include numbers.\n")
-                .append("- DO NOT include generic terms like 'IMG', 'HDR'export', 'source', 'Backup', 'Volumes', 'file', 'photo', 'random', 'id'.\n")
-                .append("- DO NOT include file extensions (like jpg, jpeg, png).\n")
-                .append("- Ignore any UUIDs, hashes, or random strings in the path, but STILL extract valid words from the rest of the path (like the folder name).\n")
-                .append("- If no valid words are found in the entire path, return []. DO NOT hallucinate words.\n");
-
-        if (ignoreWords != null && !ignoreWords.trim().isEmpty()) {
-            promptBuilder.append("- DO NOT include any of the following specific words: ")
-                    .append(ignoreWords).append(".\n");
-        }
-
-        promptBuilder.append("Return strictly a JSON array of strings, nothing else. Filepath: ").append(filePath);
-        String prompt = promptBuilder.toString();
+    private List<String> getTagsFromOllama(Path imagePath) throws IOException, InterruptedException {
+        String base64Image = Base64.getEncoder().encodeToString(Files.readAllBytes(imagePath));
+        
+        String prompt = "Analysiere dieses Bild hochpräzise. Erstelle 5-10 deutsche Schlagworte. \n" +
+                "PRIORITÄTEN: \n" +
+                "1. Ort (Stadt, Land, Sehenswürdigkeit). \n" +
+                "2. Fahrzeuge (Marke UND Modell, z.B. Porsche 911). \n" +
+                "3. Spielzeug (Spezifische Lego-Themen, Sets oder Stein-Typen). \n" +
+                "4. Sport (Sportart, Ausrüstung). \n" +
+                "5. Hauptobjekte.\n" +
+                "STRIKTE REGELN: \n" +
+                "- Nenne NIEMALS Jahreszeiten (Sommer, Winter, Herbst, Frühling).\n" +
+                "- Nenne NIEMALS Farben.\n" +
+                "- Gib NUR Schlagworte aus, getrennt durch Kommata. \n" +
+                "- KEIN Denkprozess, KEIN Einleitungstext.";
 
         ObjectNode requestBody = mapper.createObjectNode();
         requestBody.put("model", model);
         requestBody.put("prompt", prompt);
-        requestBody.put("format", "json");
         requestBody.put("stream", false);
-        requestBody.put("temperature", 0.0);
+        
+        ArrayNode imagesArray = requestBody.putArray("images");
+        imagesArray.add(base64Image);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:11434/api/generate"))
                 .header("Content-Type", "application/json")
-                .timeout(Duration.ofSeconds(120)) // 2 minutes read timeout
+                .timeout(Duration.ofSeconds(300)) // 5 minutes read timeout for vision
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()))
                 .build();
 
@@ -196,28 +196,38 @@ public class TagCommand implements Callable<Integer> {
         JsonNode responseNode = mapper.readTree(response.body());
         JsonNode responseField = responseNode.get("response");
         if (responseField == null) {
-            throw new RuntimeException("Missing 'response' field in Ollama output. Body: " + response.body());
+            throw new RuntimeException("Missing 'response' field in Ollama output.");
         }
         String responseText = responseField.asText();
 
-        JsonNode tagsNode = mapper.readTree(responseText);
+        return cleanOllamaResponse(responseText);
+    }
+
+    List<String> cleanOllamaResponse(String responseText) {
+        // Clean up response based on bash script
+        // sed -E 's/.*done thinking\.//g' | sed -E 's/.*Thinking\.//g' | sed -E 's/<thought>.*<\/thought>//g'
+        String cleanTags = responseText.replaceAll("(?s)<thought>.*?</thought>", "");
+        if (cleanTags.contains("done thinking.")) {
+            cleanTags = cleanTags.substring(cleanTags.lastIndexOf("done thinking.") + "done thinking.".length());
+        }
+        if (cleanTags.contains("Thinking.")) {
+            cleanTags = cleanTags.substring(cleanTags.lastIndexOf("Thinking.") + "Thinking.".length());
+        }
+        
+        cleanTags = cleanTags.replace("\n", "").replace("\r", "")
+                .replace("\"", "").replace("'", "");
+        if (cleanTags.endsWith(".")) {
+            cleanTags = cleanTags.substring(0, cleanTags.length() - 1);
+        }
+
         List<String> tags = new ArrayList<>();
-        if (tagsNode.isArray()) {
-            for (JsonNode node : tagsNode) {
-                if (!node.asText().trim().isEmpty()) {
-                    tags.add(node.asText().trim());
+        if (!cleanTags.trim().isEmpty() && !cleanTags.trim().equals("null")) {
+            String[] splitTags = cleanTags.split(",");
+            for (String tag : splitTags) {
+                if (!tag.trim().isEmpty()) {
+                    tags.add(tag.trim());
                 }
             }
-        } else if (tagsNode.isObject()) {
-            tagsNode.fields().forEachRemaining(entry -> {
-                if (entry.getValue().isArray() && tags.isEmpty()) {
-                    for (JsonNode node : entry.getValue()) {
-                        if (!node.asText().trim().isEmpty()) {
-                            tags.add(node.asText().trim());
-                        }
-                    }
-                }
-            });
         }
         return tags;
     }
@@ -277,62 +287,46 @@ public class TagCommand implements Callable<Integer> {
                 }
             }
         } catch (Exception e) {
-            // ignore JSON parse errors and return empty list
+            // ignore JSON parse errors
         }
         return metadata;
     }
+    
+    private void writeInstructionsTag(Path imagePath) throws IOException, InterruptedException {
+        String timestamp = LocalDate.now().toString();
+        String instructions = "AI-Tagged: " + timestamp + " via " + PRO_MARKER;
+        
+        List<String> command = new ArrayList<>();
+        command.add("exiftool");
+        command.add("-m");
+        command.add("-overwrite_original");
+        command.add("-XMP:Instructions=" + instructions);
+        command.add(imagePath.toAbsolutePath().toString());
 
-    public static List<String> filterNewTags(List<String> existingTags, List<String> generatedTags) {
-        Set<String> existingLower = existingTags.stream()
-                .map(String::toLowerCase)
-                .collect(Collectors.toSet());
-
-        List<String> tagsToAdd = new ArrayList<>();
-        Set<String> addedLower = new HashSet<>();
-
-        for (String tag : generatedTags) {
-            if (tag == null || tag.trim().isEmpty()) {
-                continue;
-            }
-            String lower = tag.trim().toLowerCase();
-            if (!existingLower.contains(lower) && !addedLower.contains(lower)) {
-                tagsToAdd.add(tag.trim());
-                addedLower.add(lower);
-            }
+        Process process = new ProcessBuilder(command).start();
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            throw new RuntimeException("exiftool failed to write instructions with exit code " + exitCode);
         }
-        return tagsToAdd;
-    }
-
-    public static List<String> mergeTags(List<String> existingTags, List<String> generatedTags) {
-        Set<String> allTagsSet = new LinkedHashSet<>(existingTags);
-        allTagsSet.addAll(generatedTags.stream()
-                .filter(t -> t != null && !t.trim().isEmpty())
-                .map(String::trim)
-                .collect(Collectors.toList()));
-        return new ArrayList<>(allTagsSet);
     }
 
     private void writeExifTags(Path imagePath, List<String> tags) throws IOException, InterruptedException {
+        String timestamp = LocalDate.now().toString();
+        String instructions = "AI-Tagged: " + timestamp + " via " + PRO_MARKER;
+        
         List<String> command = new ArrayList<>();
         command.add("exiftool");
+        command.add("-m");
         command.add("-overwrite_original");
-
-        boolean isVideo = isVideoFile(imagePath);
-
+        
         for (String tag : tags) {
             command.add("-keywords=" + tag);
         }
         for (String tag : tags) {
             command.add("-Subject=" + tag);
         }
-        if (isVideo) {
-            for (String tag : tags) {
-                command.add("-Keys:Keywords=" + tag);
-            }
-            for (String tag : tags) {
-                command.add("-ItemList:Keyword=" + tag);
-            }
-        }
+        
+        command.add("-XMP:Instructions=" + instructions);
         command.add(imagePath.toAbsolutePath().toString());
 
         Process process = new ProcessBuilder(command).start();
