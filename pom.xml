@@ -3,12 +3,12 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>de.photosexportsorter</groupId>
     <artifactId>macfotocli</artifactId>
-    <version>1.4-SNAPSHOT</version>
+    <version>1.4.0</version>
     <packaging>jar</packaging>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>25</maven.compiler.source>
-        <maven.compiler.target>25</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
     </properties>
     <dependencies>
         <dependency>
@@ -72,7 +72,7 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
                 <configuration>
-                    <release>25</release>
+                    <release>17</release>
                 </configuration>
             </plugin>
             <plugin>

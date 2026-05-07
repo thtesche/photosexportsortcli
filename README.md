@@ -8,7 +8,8 @@
 
 It offers two primary functions:
 1. **Sort:** Reorganizes messy export directories into a clean, chronological structure (`YYYY/YYYY-MM-DD, Location`).
-2. **Tag:** Uses a local LLM (Ollama) to automatically extract descriptive keywords from file paths and writes them as EXIF tags to the images using `exiftool`.
+2. **Tag:** Uses a local LLM (Ollama) to automatically extract descriptive keywords from file paths.
+3. **VisionTag:** Uses a local Ollama vision model (like `llama3.2-vision`) to analyze image content and generate keywords.
 
 ---
 
@@ -32,7 +33,7 @@ Thanks to the included Maven Wrapper, you don't need to install Maven. Just run:
 ### 2. Verify Installation (Doctor)
 Check if Ollama and exiftool are correctly installed and reachable:
 ```bash
-java -jar target/macfotocli-1.3.0-jar-with-dependencies.jar doctor
+java -jar target/macfotocli-1.4.0-jar-with-dependencies.jar doctor
 ```
 
 ### 3. Sort Photos
@@ -40,7 +41,7 @@ Reorganize your exported photos.
 
 **Example:**
 ```bash
-java -jar target/macfotocli-1.3.0-jar-with-dependencies.jar sort \
+java -jar target/macfotocli-1.4.0-jar-with-dependencies.jar sort \
   --sourceRoot=/path/to/apple/export \
   --targetRoot=/path/to/clean/structure \
   --locale=de
@@ -50,14 +51,16 @@ This will transform `Berlin, 15. März 2024` into `2024/2024-03-15, Berlin`.
 ### 4. Auto-Tag Photos (AI powered)
 Scan a directory and let Ollama automatically generate semantic tags based on the folder/file names, writing them to the EXIF data.
 
-**✨ Smart Tag Management:**
+* **Smart Synchronization:** Keywords are written to both EXIF `Keywords` and `Subject` tags, ensuring consistency.
+* **Metadata Aggregation:** If `Keywords` and `Subject` already contain different tags, they are merged before adding new ones.
 * **Non-destructive:** Existing EXIF keywords are fully preserved.
 * **Smart Deduplication:** New tags are only written if they do not already exist in the file.
 * **Case-Insensitive:** Prevents duplicate variations like `Berlin` and `berlin`.
+* **Force Overwrite:** Use `-f` or `--force` to re-tag images even if they are already processed.
 
 **Example (Dry Run - just see the tags, don't write, and ignore specific words):**
 ```bash
-java -jar target/macfotocli-1.3.0-jar-with-dependencies.jar tag \
+java -jar target/macfotocli-1.4.0-jar-with-dependencies.jar tag \
   --model=gemma4 \
   --ignore="Backup,Urlaub,Fotos" \
   --dryRun \
@@ -66,11 +69,33 @@ java -jar target/macfotocli-1.3.0-jar-with-dependencies.jar tag \
 
 **Example (Actually write tags for multiple directories using shell wildcards):**
 ```bash
-java -jar target/macfotocli-1.3.0-jar-with-dependencies.jar tag \
+java -jar target/macfotocli-1.4.0-jar-with-dependencies.jar tag \
   /path/to/200*
 ```
 
-### 5. Fix Dates
+### 5. Vision-Tag Photos (Image content analysis)
+Analyze the actual content of your images to generate highly accurate keywords. This is perfect for images with non-descriptive filenames.
+
+**✨ Key Features:**
+* **Content Awareness:** Detects objects, locations, vehicles, and context.
+* **Smart Skip:** Skips already tagged images unless `--force` is used.
+* **Instruction Marker:** Marks images as `AI-Tagged` to prevent redundant analysis.
+
+**Example (Analyze content and write tags):**
+```bash
+java -jar target/macfotocli-1.4.0-jar-with-dependencies.jar visiontag \
+  --model=llama3.2-vision \
+  /path/to/photos
+```
+
+**Example (Force re-tagging already processed images):**
+```bash
+java -jar target/macfotocli-1.4.0-jar-with-dependencies.jar visiontag \
+  --force \
+  /path/to/photos
+```
+
+### 6. Fix Dates
 Some images may lack EXIF dates but have them encoded in their folder structure (e.g. `YYYY-MM-DD`). The `fixdate` command scans directories, extracts the expected date from the directory path, and verifies it against the image's EXIF `DateTimeOriginal`. If missing or mismatched, it updates the EXIF metadata to match the folder structure.
 
 **✨ Key Features:**
@@ -80,14 +105,14 @@ Some images may lack EXIF dates but have them encoded in their folder structure 
 
 **Example (Dry Run):**
 ```bash
-java -jar target/macfotocli-1.3.0-jar-with-dependencies.jar fixdate \
+java -jar target/macfotocli-1.4.0-jar-with-dependencies.jar fixdate \
   --dryRun \
   /path/to/200*
 ```
 
 **Example (Actually write dates):**
 ```bash
-java -jar target/macfotocli-1.3.0-jar-with-dependencies.jar fixdate \
+java -jar target/macfotocli-1.4.0-jar-with-dependencies.jar fixdate \
   /path/to/200*
 ```
 
