@@ -55,11 +55,10 @@ git commit -m "chore: release v$RELEASE_VERSION"
 echo "-> Creating git tag v$RELEASE_VERSION..."
 git tag -a "v$RELEASE_VERSION" -m "Release v$RELEASE_VERSION"
 
-# 4. Update POM and README.md to the next development snapshot
-echo "-> Bumping pom.xml and README.md to $NEXT_VERSION for next development cycle..."
+# 4. Update POM to the next development snapshot
+echo "-> Bumping pom.xml to $NEXT_VERSION for next development cycle..."
 ./mvnw versions:set -DnewVersion=$NEXT_VERSION -q
 ./mvnw versions:commit -q
-sed -i '' -E "s/macfotocli-[a-zA-Z0-9.-]+-jar-with-dependencies\.jar/macfotocli-${NEXT_VERSION}-jar-with-dependencies.jar/g" README.md
 
 # 5. Commit the snapshot version
 echo "-> Committing next development version..."
