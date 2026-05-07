@@ -32,7 +32,7 @@ Thanks to the included Maven Wrapper, you don't need to install Maven. Just run:
 ### 2. Verify Installation (Doctor)
 Check if Ollama and exiftool are correctly installed and reachable:
 ```bash
-java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar doctor
+java -jar target/macfotocli-1.3.0-jar-with-dependencies.jar doctor
 ```
 
 ### 3. Sort Photos
@@ -40,7 +40,7 @@ Reorganize your exported photos.
 
 **Example:**
 ```bash
-java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar sort \
+java -jar target/macfotocli-1.3.0-jar-with-dependencies.jar sort \
   --sourceRoot=/path/to/apple/export \
   --targetRoot=/path/to/clean/structure \
   --locale=de
@@ -57,7 +57,7 @@ Scan a directory and let Ollama automatically generate semantic tags based on th
 
 **Example (Dry Run - just see the tags, don't write, and ignore specific words):**
 ```bash
-java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar tag \
+java -jar target/macfotocli-1.3.0-jar-with-dependencies.jar tag \
   --model=gemma4 \
   --ignore="Backup,Urlaub,Fotos" \
   --dryRun \
@@ -66,7 +66,7 @@ java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar tag \
 
 **Example (Actually write tags for multiple directories using shell wildcards):**
 ```bash
-java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar tag \
+java -jar target/macfotocli-1.3.0-jar-with-dependencies.jar tag \
   /path/to/200*
 ```
 
@@ -80,14 +80,14 @@ Some images may lack EXIF dates but have them encoded in their folder structure 
 
 **Example (Dry Run):**
 ```bash
-java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar fixdate \
+java -jar target/macfotocli-1.3.0-jar-with-dependencies.jar fixdate \
   --dryRun \
   /path/to/200*
 ```
 
 **Example (Actually write dates):**
 ```bash
-java -jar target/macfotocli-1.2-SNAPSHOT-jar-with-dependencies.jar fixdate \
+java -jar target/macfotocli-1.3.0-jar-with-dependencies.jar fixdate \
   /path/to/200*
 ```
 
