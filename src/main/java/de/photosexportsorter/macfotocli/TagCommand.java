@@ -66,7 +66,7 @@ public class TagCommand implements Callable<Integer> {
                     .forEach(this::processFile);
         }
 
-        spec.commandLine().getOut().println("@|bold,green Tagging complete.|@");
+        spec.commandLine().getOut().println(Ansi.AUTO.string("@|bold,green Tagging complete.|@"));
         return 0;
     }
 
