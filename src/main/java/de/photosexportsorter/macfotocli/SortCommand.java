@@ -17,6 +17,7 @@ import org.apache.commons.io.FileUtils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Help.Ansi;
 
 @Command(name = "sort", description = "Reorganizes Apple Photos exports into a clean, chronological structure.")
 public class SortCommand implements Callable<Integer> {
@@ -39,12 +40,12 @@ public class SortCommand implements Callable<Integer> {
     @Override
     public Integer call() throws Exception {
         if (!source.exists() || !source.isDirectory()) {
-            spec.commandLine().getErr().println("@|red Error: Source root must be a valid directory.|@");
+            spec.commandLine().getErr().println(Ansi.AUTO.string("@|red Error: Source root must be a valid directory.|@"));
             return 1;
         }
 
-        spec.commandLine().getOut().println("@|yellow Sorting photos from:|@ " + source.getAbsolutePath());
-        spec.commandLine().getOut().println("@|yellow Target directory:|@   " + target.getAbsolutePath());
+        spec.commandLine().getOut().println(Ansi.AUTO.string("@|yellow Sorting photos from:|@ " + source.getAbsolutePath()));
+        spec.commandLine().getOut().println(Ansi.AUTO.string("@|yellow Target directory:|@   " + target.getAbsolutePath()));
         spec.commandLine().getOut().println();
 
         Set<String> dirsInDir = listDirsUsingFilesList(source.getAbsolutePath());
@@ -52,7 +53,7 @@ public class SortCommand implements Callable<Integer> {
             try {
                 PathInfo pathInfo = createTargetDirs(re_sort_location_date(dir, locale));
                 spec.commandLine().getOut()
-                        .println("@|green Processing:|@ " + Path.of(pathInfo.sourceDir()).getFileName());
+                        .println(Ansi.AUTO.string("@|green Processing:|@ " + Path.of(pathInfo.sourceDir()).getFileName()));
 
                 FileUtils.copyDirectory(new File(pathInfo.sourceDir()), new File(pathInfo.targetDir()));
                 if (deleteSource) {
@@ -64,7 +65,7 @@ public class SortCommand implements Callable<Integer> {
         });
 
         spec.commandLine().getOut().println();
-        spec.commandLine().getOut().println("@|bold,green Success! Photos have been reorganized.|@");
+        spec.commandLine().getOut().println(Ansi.AUTO.string("@|bold,green Success! Photos have been reorganized.|@"));
         return 0;
     }
 

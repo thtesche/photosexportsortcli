@@ -6,6 +6,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -22,6 +23,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Help.Ansi;
 
 @Command(name = "tag", description = "Automatically generate and write EXIF keywords using local Ollama model based on filepath.")
 public class TagCommand implements Callable<Integer> {
@@ -49,13 +51,13 @@ public class TagCommand implements Callable<Integer> {
     @Override
     public Integer call() throws Exception {
         if (!directory.exists() || !directory.isDirectory()) {
-            spec.commandLine().getErr().println("@|red Error: Target must be a valid directory.|@");
+            spec.commandLine().getErr().println(Ansi.AUTO.string("@|red Error: Target must be a valid directory.|@"));
             return 1;
         }
 
-        spec.commandLine().getOut().println("@|yellow Scanning directory:|@ " + directory.getAbsolutePath());
+        spec.commandLine().getOut().println(Ansi.AUTO.string("@|yellow Scanning directory:|@ " + directory.getAbsolutePath()));
         if (dryRun) {
-            spec.commandLine().getOut().println("@|bold,yellow [DRY RUN ENABLED - No files will be modified]|@\n");
+            spec.commandLine().getOut().println(Ansi.AUTO.string("@|bold,yellow [DRY RUN ENABLED - No files will be modified]|@\n"));
         }
 
         try (Stream<Path> stream = Files.walk(directory.toPath())) {
@@ -79,26 +81,34 @@ public class TagCommand implements Callable<Integer> {
 
     private void processFile(Path path) {
         String relativePath = directory.toPath().relativize(path).toString();
-        spec.commandLine().getOut().print("@|cyan Analyzing:|@ " + relativePath + " ... ");
+        spec.commandLine().getOut().print(Ansi.AUTO.string("@|cyan Analyzing:|@ " + relativePath + " ... "));
         try {
-            List<String> tags = getTagsFromOllama(relativePath);
-            if (tags == null || tags.isEmpty()) {
-                spec.commandLine().getOut().println("@|yellow [No tags extracted]|@");
+            List<String> generatedTags = getTagsFromOllama(relativePath);
+            if (generatedTags == null || generatedTags.isEmpty()) {
+                spec.commandLine().getOut().println(Ansi.AUTO.string("@|yellow [No tags extracted]|@"));
                 return;
             }
 
-            spec.commandLine().getOut().print("@|green Tags:|@ " + tags + " ... ");
+            List<String> existingTags = getExistingKeywords(path);
+            List<String> tagsToAdd = filterNewTags(existingTags, generatedTags);
+
+            if (tagsToAdd.isEmpty()) {
+                spec.commandLine().getOut().println(Ansi.AUTO.string("@|yellow [All tags already exist, skipped]|@"));
+                return;
+            }
+
+            spec.commandLine().getOut().print(Ansi.AUTO.string("@|green Tags:|@ " + tagsToAdd + " ... "));
 
             if (dryRun) {
-                spec.commandLine().getOut().println("@|yellow [Skipped writing]|@");
+                spec.commandLine().getOut().println(Ansi.AUTO.string("@|yellow [Skipped writing]|@"));
             } else {
-                writeExifTags(path, tags);
-                spec.commandLine().getOut().println("@|green [Written]|@");
+                writeExifTags(path, tagsToAdd);
+                spec.commandLine().getOut().println(Ansi.AUTO.string("@|green [Written]|@"));
             }
 
         } catch (Exception e) {
             String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-            spec.commandLine().getOut().println("@|red [ERROR: " + msg + "]|@");
+            spec.commandLine().getOut().println(Ansi.AUTO.string("@|red [ERROR: " + msg + "]|@"));
         }
     }
 
@@ -170,6 +180,58 @@ public class TagCommand implements Callable<Integer> {
             });
         }
         return tags;
+    }
+
+    private List<String> getExistingKeywords(Path imagePath) throws IOException, InterruptedException {
+        Process process = new ProcessBuilder("exiftool", "-keywords", "-j", imagePath.toAbsolutePath().toString()).start();
+        String json = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        process.waitFor();
+
+        List<String> existing = new ArrayList<>();
+        if (json == null || json.trim().isEmpty()) {
+            return existing;
+        }
+
+        try {
+            com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(json);
+            if (root.isArray() && root.size() > 0) {
+                com.fasterxml.jackson.databind.JsonNode fileNode = root.get(0);
+                com.fasterxml.jackson.databind.JsonNode keywordsNode = fileNode.get("Keywords");
+                if (keywordsNode != null) {
+                    if (keywordsNode.isArray()) {
+                        for (com.fasterxml.jackson.databind.JsonNode n : keywordsNode) {
+                            existing.add(n.asText());
+                        }
+                    } else {
+                        existing.add(keywordsNode.asText());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // ignore JSON parse errors and return empty list
+        }
+        return existing;
+    }
+
+    public static List<String> filterNewTags(List<String> existingTags, List<String> generatedTags) {
+        java.util.Set<String> existingLower = existingTags.stream()
+                .map(String::toLowerCase)
+                .collect(java.util.stream.Collectors.toSet());
+
+        List<String> tagsToAdd = new ArrayList<>();
+        java.util.Set<String> addedLower = new java.util.HashSet<>();
+
+        for (String tag : generatedTags) {
+            if (tag == null || tag.trim().isEmpty()) {
+                continue;
+            }
+            String lower = tag.trim().toLowerCase();
+            if (!existingLower.contains(lower) && !addedLower.contains(lower)) {
+                tagsToAdd.add(tag.trim());
+                addedLower.add(lower);
+            }
+        }
+        return tagsToAdd;
     }
 
     private void writeExifTags(Path imagePath, List<String> tags) throws IOException, InterruptedException {
