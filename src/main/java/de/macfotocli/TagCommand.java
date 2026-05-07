@@ -54,6 +54,7 @@ public class TagCommand implements Callable<Integer> {
             .connectTimeout(Duration.ofSeconds(10))
             .build();
     private static final ObjectMapper mapper = new ObjectMapper();
+    private static final String PRO_MARKER = "Gemma4-Pro-Prompt";
 
     @Override
     public Integer call() throws Exception {
@@ -147,6 +148,9 @@ public class TagCommand implements Callable<Integer> {
             if (!force && tagsToAdd.isEmpty() && metadata.alreadySynced) {
                 // All tags already exist and are synced -> do not print, next file will
                 // overwrite
+                if (!dryRun) {
+                    writeInstructionsTag(path);
+                }
                 return;
             }
 
@@ -357,9 +361,31 @@ public class TagCommand implements Callable<Integer> {
         return new ArrayList<>(allTagsSet);
     }
 
-    private void writeExifTags(Path imagePath, List<String> tags) throws IOException, InterruptedException {
+    private void writeInstructionsTag(Path imagePath) throws IOException, InterruptedException {
+        String timestamp = java.time.LocalDate.now().toString();
+        String instructions = "AI-Tagged: " + timestamp + " via " + PRO_MARKER;
+
         List<String> command = new ArrayList<>();
         command.add("exiftool");
+        command.add("-m");
+        command.add("-overwrite_original");
+        command.add("-XMP:Instructions=" + instructions);
+        command.add(imagePath.toAbsolutePath().toString());
+
+        Process process = new ProcessBuilder(command).start();
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            throw new RuntimeException("exiftool failed to write instructions with exit code " + exitCode);
+        }
+    }
+
+    private void writeExifTags(Path imagePath, List<String> tags) throws IOException, InterruptedException {
+        String timestamp = java.time.LocalDate.now().toString();
+        String instructions = "AI-Tagged: " + timestamp + " via " + PRO_MARKER;
+
+        List<String> command = new ArrayList<>();
+        command.add("exiftool");
+        command.add("-m");
         command.add("-overwrite_original");
 
         boolean isVideo = isVideoFile(imagePath);
@@ -378,6 +404,8 @@ public class TagCommand implements Callable<Integer> {
                 command.add("-ItemList:Keyword=" + tag);
             }
         }
+
+        command.add("-XMP:Instructions=" + instructions);
         command.add(imagePath.toAbsolutePath().toString());
 
         Process process = new ProcessBuilder(command).start();
