@@ -38,3 +38,6 @@ Icon
 
 # Logs
 *.log
+
+# MacFotoCli progress lists
+.macfotocli_*

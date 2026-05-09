@@ -81,13 +81,65 @@ public class TagCommand implements Callable<Integer> {
                 continue;
             }
 
-            spec.commandLine().getOut()
-                    .println(Ansi.AUTO.string("\n@|yellow Scanning directory:|@ " + dir.getAbsolutePath()));
+            String listName = ProcessingList.getListFilename("tag", dir);
+            File listFile = new File(listName);
+            File doneFile = new File(listName + ".done");
 
-            try (Stream<Path> stream = Files.walk(dir.toPath())) {
-                stream.filter(Files::isRegularFile)
-                        .filter(this::isImageFile)
-                        .forEach(path -> processFile(path, dir));
+            ProcessingList pList;
+            if (listFile.exists()) {
+                spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|yellow Resuming directory:|@ " + dir.getAbsolutePath() + " (using " + listName + ")"));
+                pList = ProcessingList.load(listFile);
+                if (!pList.rootPath.equals(dir.getAbsolutePath())) {
+                    spec.commandLine().getErr().println(Ansi.AUTO.string("@|red Error: List file root path mismatch. Expected:|@ " + dir.getAbsolutePath() + " @|red but found:|@ " + pList.rootPath));
+                    continue;
+                }
+            } else if (doneFile.exists()) {
+                spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|green Skipping directory (already fully processed):|@ " + dir.getAbsolutePath()));
+                continue;
+            } else {
+                spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|yellow Scanning directory:|@ " + dir.getAbsolutePath()));
+                pList = new ProcessingList();
+                pList.rootPath = dir.getAbsolutePath();
+                pList.command = "tag";
+                try (Stream<Path> stream = Files.walk(dir.toPath())) {
+                    List<Path> allFiles = stream.filter(Files::isRegularFile)
+                            .filter(this::isImageFile)
+                            .collect(Collectors.toList());
+                    for (Path p : allFiles) {
+                        ProcessingList.Entry e = new ProcessingList.Entry();
+                        e.path = dir.toPath().relativize(p).toString();
+                        pList.entries.add(e);
+                    }
+                }
+                pList.save(listFile);
+            }
+
+            int count = 0;
+            int total = pList.entries.size();
+            for (ProcessingList.Entry entry : pList.entries) {
+                count++;
+                if ("DONE".equals(entry.status)) {
+                    continue;
+                }
+
+                Path filePath = dir.toPath().resolve(entry.path);
+                if (!Files.exists(filePath)) {
+                    spec.commandLine().getOut().println(Ansi.AUTO.string("\r\033[K@|yellow Skipping (file missing):|@ " + entry.path));
+                    entry.status = "DONE";
+                    pList.save(listFile);
+                    continue;
+                }
+
+                String prefix = Ansi.AUTO.string("@|blue [" + count + "/" + total + "]|@ ");
+                processFile(filePath, dir, prefix);
+                
+                entry.status = "DONE";
+                pList.save(listFile);
+            }
+
+            if (listFile.exists()) {
+                listFile.renameTo(doneFile);
+                spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|bold,green Directory complete: |@" + dir.getAbsolutePath()));
             }
         }
 
@@ -110,17 +162,17 @@ public class TagCommand implements Callable<Integer> {
         return name.endsWith(".mp4") || name.endsWith(".mov") || name.endsWith(".m4v") || name.endsWith(".avi");
     }
 
-    private void processFile(Path path, File rootDirectory) {
+    private void processFile(Path path, File rootDirectory, String prefix) {
         String fullPath = path.toAbsolutePath().toString();
         String relativePath = rootDirectory.toPath().relativize(path).toString();
 
-        spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string("@|cyan Analyzing:|@ " + fullPath));
+        spec.commandLine().getOut().print("\r\033[K" + prefix + Ansi.AUTO.string("@|cyan Analyzing:|@ " + fullPath));
         spec.commandLine().getOut().flush();
 
         // Optimization: check if there are any descriptive words in the path (excluding
         // extension)
         if (!hasWords(relativePath)) {
-            spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO
+            spec.commandLine().getOut().print("\r\033[K" + prefix + Ansi.AUTO
                     .string("@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (No descriptive words in path)"));
             spec.commandLine().getOut().flush();
             return;
@@ -131,7 +183,7 @@ public class TagCommand implements Callable<Integer> {
 
             // Skip if already tagged with Pro-Prompt and not forced
             if (!force && metadata.instructions != null && metadata.instructions.contains("Gemma4-Pro-Prompt")) {
-                spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO.string(
+                spec.commandLine().getOut().print("\r\033[K" + prefix + Ansi.AUTO.string(
                         "@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (Already tagged with Pro-Prompt)"));
                 spec.commandLine().getOut().flush();
                 return;
@@ -157,7 +209,7 @@ public class TagCommand implements Callable<Integer> {
             // Aggregate all tags: existing (union) + new from AI
             List<String> finalTags = mergeTags(metadata.keywords, generatedTags);
 
-            spec.commandLine().getOut().print("\r\033[K" + Ansi.AUTO
+            spec.commandLine().getOut().print("\r\033[K" + prefix + Ansi.AUTO
                     .string("@|cyan Analyzing:|@ " + fullPath + " | @|green Tags:|@ " + tagsToAdd + " ... "));
 
             if (dryRun) {
