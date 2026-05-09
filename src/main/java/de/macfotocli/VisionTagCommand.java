@@ -46,7 +46,7 @@ public class VisionTagCommand implements Callable<Integer> {
     @Option(names = "--dryRun", description = "If set, only queries Ollama but does NOT write to the files via exiftool")
     private boolean dryRun = false;
 
-    @Option(names = {"-f", "--force"}, description = "Force re-tagging even if the image is already AI-tagged")
+    @Option(names = { "-f", "--force" }, description = "Force re-tagging even if the image is already AI-tagged")
     private boolean force = false;
 
     private static final HttpClient httpClient = HttpClient.newBuilder()
@@ -63,17 +63,20 @@ public class VisionTagCommand implements Callable<Integer> {
         }
 
         if (dirsToProcess.isEmpty()) {
-            spec.commandLine().getErr().println(Ansi.AUTO.string("@|red Error: No directories specified. You must provide at least one directory.|@"));
+            spec.commandLine().getErr().println(Ansi.AUTO
+                    .string("@|red Error: No directories specified. You must provide at least one directory.|@"));
             return 1;
         }
 
         if (dryRun) {
-            spec.commandLine().getOut().println(Ansi.AUTO.string("@|bold,yellow [DRY RUN ENABLED - No files will be modified]|@\n"));
+            spec.commandLine().getOut()
+                    .println(Ansi.AUTO.string("@|bold,yellow [DRY RUN ENABLED - No files will be modified]|@\n"));
         }
 
         for (File dir : dirsToProcess) {
             if (!dir.exists() || !dir.isDirectory()) {
-                spec.commandLine().getErr().println(Ansi.AUTO.string("@|yellow Warning: Skipping invalid directory:|@ " + dir.getAbsolutePath()));
+                spec.commandLine().getErr().println(
+                        Ansi.AUTO.string("@|yellow Warning: Skipping invalid directory:|@ " + dir.getAbsolutePath()));
                 continue;
             }
 
@@ -83,17 +86,22 @@ public class VisionTagCommand implements Callable<Integer> {
 
             ProcessingList pList;
             if (listFile.exists()) {
-                spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|yellow Resuming directory:|@ " + dir.getAbsolutePath() + " (using " + listName + ")"));
+                spec.commandLine().getOut().println(Ansi.AUTO.string(
+                        "\n@|yellow Resuming directory:|@ " + dir.getAbsolutePath() + " (using " + listName + ")"));
                 pList = ProcessingList.load(listFile);
                 if (!pList.rootPath.equals(dir.getAbsolutePath())) {
-                    spec.commandLine().getErr().println(Ansi.AUTO.string("@|red Error: List file root path mismatch. Expected:|@ " + dir.getAbsolutePath() + " @|red but found:|@ " + pList.rootPath));
+                    spec.commandLine().getErr()
+                            .println(Ansi.AUTO.string("@|red Error: List file root path mismatch. Expected:|@ "
+                                    + dir.getAbsolutePath() + " @|red but found:|@ " + pList.rootPath));
                     continue;
                 }
             } else if (doneFile.exists()) {
-                spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|green Skipping directory (already fully processed):|@ " + dir.getAbsolutePath()));
+                spec.commandLine().getOut().println(Ansi.AUTO
+                        .string("\n@|green Skipping directory (already fully processed):|@ " + dir.getAbsolutePath()));
                 continue;
             } else {
-                spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|yellow Scanning directory:|@ " + dir.getAbsolutePath()));
+                spec.commandLine().getOut()
+                        .println(Ansi.AUTO.string("\n@|yellow Scanning directory:|@ " + dir.getAbsolutePath()));
                 pList = new ProcessingList();
                 pList.rootPath = dir.getAbsolutePath();
                 pList.command = "visiontag";
@@ -120,7 +128,8 @@ public class VisionTagCommand implements Callable<Integer> {
 
                 Path filePath = dir.toPath().resolve(entry.path);
                 if (!Files.exists(filePath)) {
-                    spec.commandLine().getOut().println(Ansi.AUTO.string("\r\033[K@|yellow Skipping (file missing):|@ " + entry.path));
+                    spec.commandLine().getOut()
+                            .println(Ansi.AUTO.string("\r\033[K@|yellow Skipping (file missing):|@ " + entry.path));
                     entry.status = "DONE";
                     pList.save(listFile);
                     continue;
@@ -128,14 +137,15 @@ public class VisionTagCommand implements Callable<Integer> {
 
                 String prefix = Ansi.AUTO.string("@|blue [" + count + "/" + total + "]|@ ");
                 processFile(filePath, prefix);
-                
+
                 entry.status = "DONE";
                 pList.save(listFile);
             }
 
             if (listFile.exists()) {
                 listFile.renameTo(doneFile);
-                spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|bold,green Directory complete: |@" + dir.getAbsolutePath()));
+                spec.commandLine().getOut()
+                        .println(Ansi.AUTO.string("\n@|bold,green Directory complete: |@" + dir.getAbsolutePath()));
             }
         }
 
@@ -154,7 +164,7 @@ public class VisionTagCommand implements Callable<Integer> {
 
     private void processFile(Path path, String prefix) {
         String fullPath = path.toAbsolutePath().toString();
-        
+
         spec.commandLine().getOut().print("\r\033[K" + prefix + Ansi.AUTO.string("@|cyan Analyzing:|@ " + fullPath));
         spec.commandLine().getOut().flush();
 
@@ -163,15 +173,18 @@ public class VisionTagCommand implements Callable<Integer> {
             ExifMetadata metadata = getExifMetadata(path);
 
             if (!force && metadata.instructions != null && metadata.instructions.contains(PRO_MARKER)) {
-                spec.commandLine().getOut().print("\r\033[K" + prefix + Ansi.AUTO.string("@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (Already tagged with Pro-Prompt)"));
+                spec.commandLine().getOut().print("\r\033[K" + prefix + Ansi.AUTO.string(
+                        "@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (Already tagged with Pro-Prompt)"));
                 spec.commandLine().getOut().flush();
                 return;
             }
 
             if (metadata.instructions != null && metadata.instructions.contains("AI-Tagged")) {
-                spec.commandLine().getOut().print("\r\033[K" + prefix + Ansi.AUTO.string("@|cyan \uD83D\uDD04 Updating:|@ " + fullPath + " with better prompt... "));
+                spec.commandLine().getOut().print("\r\033[K" + prefix
+                        + Ansi.AUTO.string("@|cyan \uD83D\uDD04 Updating:|@ " + fullPath + " with better prompt... "));
             } else {
-                spec.commandLine().getOut().print("\r\033[K" + prefix + Ansi.AUTO.string("@|cyan \uD83E\uDD16 Analyzing content:|@ " + fullPath + " ... "));
+                spec.commandLine().getOut().print("\r\033[K" + prefix
+                        + Ansi.AUTO.string("@|cyan \uD83E\uDD16 Analyzing content:|@ " + fullPath + " ... "));
             }
             spec.commandLine().getOut().flush();
 
@@ -195,7 +208,9 @@ public class VisionTagCommand implements Callable<Integer> {
             // Aggregate all tags: existing (union) + new from AI
             List<String> finalTags = TagCommand.mergeTags(metadata.keywords, generatedTags);
 
-            spec.commandLine().getOut().print("\r\033[K" + prefix + Ansi.AUTO.string("@|cyan \uD83E\uDD16 Analyzing content:|@ " + fullPath + " | @|green New Tags:|@ " + tagsToAdd + " ... "));
+            spec.commandLine().getOut()
+                    .print("\r\033[K" + prefix + Ansi.AUTO.string("@|cyan \uD83E\uDD16 Analyzing content:|@ " + fullPath
+                            + " | @|green New Tags:|@ " + tagsToAdd + " ... "));
 
             if (dryRun) {
                 spec.commandLine().getOut().println(Ansi.AUTO.string("@|yellow [Skipped writing]|@"));
@@ -212,11 +227,11 @@ public class VisionTagCommand implements Callable<Integer> {
 
     private List<String> getTagsFromOllama(Path imagePath) throws IOException, InterruptedException {
         String base64Image = Base64.getEncoder().encodeToString(Files.readAllBytes(imagePath));
-        
+
         String prompt = "Analysiere dieses Bild hochpräzise. Erstelle 5-10 deutsche Schlagworte. \n" +
                 "PRIORITÄTEN: \n" +
                 "1. Ort (Stadt, Land, Sehenswürdigkeit). \n" +
-                "2. Fahrzeuge (Marke UND Modell, z.B. Porsche 911). \n" +
+                "2. Fahrzeuge (Marke, Modell UND Baureihe, falls erkennbar). \n" +
                 "3. Spielzeug (Spezifische Lego-Themen, Sets oder Stein-Typen). \n" +
                 "4. Sport (Sportart, Ausrüstung). \n" +
                 "5. Hauptobjekte.\n" +
@@ -230,7 +245,7 @@ public class VisionTagCommand implements Callable<Integer> {
         requestBody.put("model", model);
         requestBody.put("prompt", prompt);
         requestBody.put("stream", false);
-        
+
         ArrayNode imagesArray = requestBody.putArray("images");
         imagesArray.add(base64Image);
 
@@ -258,7 +273,8 @@ public class VisionTagCommand implements Callable<Integer> {
 
     List<String> cleanOllamaResponse(String responseText) {
         // Clean up response based on bash script
-        // sed -E 's/.*done thinking\.//g' | sed -E 's/.*Thinking\.//g' | sed -E 's/<thought>.*<\/thought>//g'
+        // sed -E 's/.*done thinking\.//g' | sed -E 's/.*Thinking\.//g' | sed -E
+        // 's/<thought>.*<\/thought>//g'
         String cleanTags = responseText.replaceAll("(?s)<thought>.*?</thought>", "");
         if (cleanTags.contains("done thinking.")) {
             cleanTags = cleanTags.substring(cleanTags.lastIndexOf("done thinking.") + "done thinking.".length());
@@ -266,7 +282,7 @@ public class VisionTagCommand implements Callable<Integer> {
         if (cleanTags.contains("Thinking.")) {
             cleanTags = cleanTags.substring(cleanTags.lastIndexOf("Thinking.") + "Thinking.".length());
         }
-        
+
         cleanTags = cleanTags.replace("\n", "").replace("\r", "")
                 .replace("\"", "").replace("'", "");
         if (cleanTags.endsWith(".")) {
@@ -292,7 +308,8 @@ public class VisionTagCommand implements Callable<Integer> {
     }
 
     private ExifMetadata getExifMetadata(Path imagePath) throws IOException, InterruptedException {
-        Process process = new ProcessBuilder("exiftool", "-XMP:Instructions", "-keywords", "-Subject", "-j", imagePath.toAbsolutePath().toString()).start();
+        Process process = new ProcessBuilder("exiftool", "-XMP:Instructions", "-keywords", "-Subject", "-j",
+                imagePath.toAbsolutePath().toString()).start();
         String json = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         process.waitFor();
 
@@ -305,7 +322,7 @@ public class VisionTagCommand implements Callable<Integer> {
             JsonNode root = mapper.readTree(json);
             if (root.isArray() && root.size() > 0) {
                 JsonNode fileNode = root.get(0);
-                
+
                 JsonNode instructionsNode = fileNode.get("Instructions");
                 if (instructionsNode != null) {
                     metadata.instructions = instructionsNode.asText();
@@ -320,7 +337,7 @@ public class VisionTagCommand implements Callable<Integer> {
                         kwSet.add(keywordsNode.asText());
                     }
                 }
-                
+
                 Set<String> subSet = new HashSet<>();
                 JsonNode subjectNode = fileNode.get("Subject");
                 if (subjectNode != null) {
@@ -330,7 +347,7 @@ public class VisionTagCommand implements Callable<Integer> {
                         subSet.add(subjectNode.asText());
                     }
                 }
-                
+
                 metadata.alreadySynced = kwSet.equals(subSet);
                 metadata.keywords.addAll(kwSet);
                 for (String s : subSet) {
@@ -344,11 +361,11 @@ public class VisionTagCommand implements Callable<Integer> {
         }
         return metadata;
     }
-    
+
     private void writeInstructionsTag(Path imagePath) throws IOException, InterruptedException {
         String timestamp = LocalDate.now().toString();
         String instructions = "AI-Tagged: " + timestamp + " via " + PRO_MARKER;
-        
+
         List<String> command = new ArrayList<>();
         command.add("exiftool");
         command.add("-m");
@@ -366,19 +383,19 @@ public class VisionTagCommand implements Callable<Integer> {
     private void writeExifTags(Path imagePath, List<String> tags) throws IOException, InterruptedException {
         String timestamp = LocalDate.now().toString();
         String instructions = "AI-Tagged: " + timestamp + " via " + PRO_MARKER;
-        
+
         List<String> command = new ArrayList<>();
         command.add("exiftool");
         command.add("-m");
         command.add("-overwrite_original");
-        
+
         for (String tag : tags) {
             command.add("-keywords=" + tag);
         }
         for (String tag : tags) {
             command.add("-Subject=" + tag);
         }
-        
+
         command.add("-XMP:Instructions=" + instructions);
         command.add(imagePath.toAbsolutePath().toString());
 
