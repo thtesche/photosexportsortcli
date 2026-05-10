@@ -66,6 +66,7 @@ Scan a directory and let Ollama automatically generate semantic tags based on th
 * **Non-destructive:** Existing EXIF keywords are fully preserved.
 * **Smart Deduplication:** New tags are only written if they do not already exist in the file.
 * **Case-Insensitive:** Prevents duplicate variations like `Berlin` and `berlin`.
+* **Progress Tracking:** Automatically creates a local processing list to resume if interrupted.
 * **Force Overwrite:** Use `-f` or `--force` to re-tag images even if they are already processed.
 
 **Example (Dry Run - just see the tags, don't write, and ignore specific words):**
@@ -94,6 +95,7 @@ Analyze the actual content of your images to generate highly accurate keywords. 
 * **Content Awareness:** Detects objects, locations, vehicles, and context.
 * **Smart Skip:** Skips already tagged images unless `--force` is used.
 * **Instruction Marker:** Marks images as `AI-Tagged` to prevent redundant analysis.
+* **Progress Tracking:** Automatically creates a local processing list to resume if interrupted.
 
 **Example (Analyze content and write tags):**
 
@@ -135,6 +137,19 @@ java -jar target/macfotocli-1.7.0-jar-with-dependencies.jar fixdate \
 java -jar target/macfotocli-1.7.0-jar-with-dependencies.jar fixdate \
   /path/to/200*
 ```
+
+---
+
+## 🛡️ Reliability & Resuming
+
+Tagging thousands of photos can take a long time, especially with AI vision models. **MacFotoCli** is designed to be robust:
+
+* **Progress Tracking:** Every `tag` or `visiontag` run creates a hidden progress list (`.macfotocli_*.json`) in your current directory.
+* **Automatic Resuming:** If the process is interrupted (power loss, manual stop, network timeout, etc.), simply run the command again. It will detect the existing list and pick up exactly where it left off.
+* **Drive Disconnection Robustness:** If an external or network drive is disconnected during processing, the tool will stop immediately with a clear error. Files that couldn't be accessed will remain in the `PENDING` state, so they can be processed once the connection is restored.
+* **Live Progress:** A real-time counter `[x/y]` shows your progress within the current list.
+* **Completion Status:** Once a directory is fully processed, the list file is renamed to `.done`.
+* **Git Friendly:** These progress files are automatically ignored by Git.
 
 ---
 

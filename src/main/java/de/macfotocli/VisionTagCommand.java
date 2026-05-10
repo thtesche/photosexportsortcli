@@ -76,8 +76,8 @@ public class VisionTagCommand implements Callable<Integer> {
         for (File dir : dirsToProcess) {
             if (!dir.exists() || !dir.isDirectory()) {
                 spec.commandLine().getErr().println(
-                        Ansi.AUTO.string("@|yellow Warning: Skipping invalid directory:|@ " + dir.getAbsolutePath()));
-                continue;
+                        Ansi.AUTO.string("@|red Error: Invalid or missing directory:|@ " + dir.getAbsolutePath()));
+                return 1;
             }
 
             String listName = ProcessingList.getListFilename("visiontag", dir);
@@ -118,28 +118,42 @@ public class VisionTagCommand implements Callable<Integer> {
                 pList.save(listFile);
             }
 
-            int count = 0;
-            int total = pList.entries.size();
-            for (ProcessingList.Entry entry : pList.entries) {
-                count++;
-                if ("DONE".equals(entry.status)) {
-                    continue;
+            try {
+                int count = 0;
+                int total = pList.entries.size();
+                for (ProcessingList.Entry entry : pList.entries) {
+                    count++;
+                    if ("DONE".equals(entry.status)) {
+                        continue;
+                    }
+
+                    if (!dir.exists()) {
+                        spec.commandLine().getErr().println(Ansi.AUTO.string("\n@|red Error: Drive or directory disconnected:|@ " + dir.getAbsolutePath()));
+                        return 1;
+                    }
+
+                    Path filePath = dir.toPath().resolve(entry.path);
+                    if (!Files.exists(filePath)) {
+                        spec.commandLine().getOut()
+                                .println(Ansi.AUTO.string("\r\033[K@|yellow Skipping (file missing):|@ " + entry.path));
+                        // Keep status as PENDING
+                        continue;
+                    }
+
+                    String prefix = Ansi.AUTO.string("@|blue [" + count + "/" + total + "]|@ ");
+                    boolean success = processFile(filePath, prefix);
+                    
+                    if (success) {
+                        entry.status = "DONE";
+                        pList.save(listFile);
+                    }
                 }
-
-                Path filePath = dir.toPath().resolve(entry.path);
-                if (!Files.exists(filePath)) {
-                    spec.commandLine().getOut()
-                            .println(Ansi.AUTO.string("\r\033[K@|yellow Skipping (file missing):|@ " + entry.path));
-                    entry.status = "DONE";
-                    pList.save(listFile);
-                    continue;
+            } catch (Exception e) {
+                if (e.getMessage() != null && e.getMessage().contains("Drive disconnected")) {
+                    spec.commandLine().getErr().println(Ansi.AUTO.string("\n@|bold,red FATAL ERROR:|@ " + e.getMessage()));
+                    return 1;
                 }
-
-                String prefix = Ansi.AUTO.string("@|blue [" + count + "/" + total + "]|@ ");
-                processFile(filePath, prefix);
-
-                entry.status = "DONE";
-                pList.save(listFile);
+                throw e;
             }
 
             if (listFile.exists()) {
@@ -162,7 +176,7 @@ public class VisionTagCommand implements Callable<Integer> {
         return name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp");
     }
 
-    private void processFile(Path path, String prefix) {
+    private boolean processFile(Path path, String prefix) {
         String fullPath = path.toAbsolutePath().toString();
 
         spec.commandLine().getOut().print("\r\033[K" + prefix + Ansi.AUTO.string("@|cyan Analyzing:|@ " + fullPath));
@@ -176,7 +190,7 @@ public class VisionTagCommand implements Callable<Integer> {
                 spec.commandLine().getOut().print("\r\033[K" + prefix + Ansi.AUTO.string(
                         "@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (Already tagged with Pro-Prompt)"));
                 spec.commandLine().getOut().flush();
-                return;
+                return true;
             }
 
             if (metadata.instructions != null && metadata.instructions.contains("AI-Tagged")) {
@@ -191,7 +205,7 @@ public class VisionTagCommand implements Callable<Integer> {
             List<String> generatedTags = getTagsFromOllama(path);
             if (generatedTags == null || generatedTags.isEmpty()) {
                 spec.commandLine().getOut().println(Ansi.AUTO.string("@|red [No tags generated]|@"));
-                return;
+                return true;
             }
 
             List<String> tagsToAdd = TagCommand.filterNewTags(metadata.keywords, generatedTags);
@@ -202,7 +216,7 @@ public class VisionTagCommand implements Callable<Integer> {
                 if (!dryRun) {
                     writeInstructionsTag(path);
                 }
-                return;
+                return true;
             }
 
             // Aggregate all tags: existing (union) + new from AI
@@ -219,9 +233,14 @@ public class VisionTagCommand implements Callable<Integer> {
                 spec.commandLine().getOut().println(Ansi.AUTO.string("@|green [Written]|@"));
             }
 
+            return true;
         } catch (Exception e) {
             String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
             spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|red [\u274C ERROR: " + msg + "]|@"));
+            if (msg.toLowerCase().contains("device not configured") || msg.toLowerCase().contains("no such device")) {
+                throw new RuntimeException("Drive disconnected: " + msg);
+            }
+            return false;
         }
     }
 

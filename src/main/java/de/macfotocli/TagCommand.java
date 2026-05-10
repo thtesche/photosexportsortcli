@@ -77,8 +77,8 @@ public class TagCommand implements Callable<Integer> {
         for (File dir : dirsToProcess) {
             if (!dir.exists() || !dir.isDirectory()) {
                 spec.commandLine().getErr().println(
-                        Ansi.AUTO.string("@|yellow Warning: Skipping invalid directory:|@ " + dir.getAbsolutePath()));
-                continue;
+                        Ansi.AUTO.string("@|red Error: Invalid or missing directory:|@ " + dir.getAbsolutePath()));
+                return 1;
             }
 
             String listName = ProcessingList.getListFilename("tag", dir);
@@ -114,27 +114,41 @@ public class TagCommand implements Callable<Integer> {
                 pList.save(listFile);
             }
 
-            int count = 0;
-            int total = pList.entries.size();
-            for (ProcessingList.Entry entry : pList.entries) {
-                count++;
-                if ("DONE".equals(entry.status)) {
-                    continue;
-                }
+            try {
+                int count = 0;
+                int total = pList.entries.size();
+                for (ProcessingList.Entry entry : pList.entries) {
+                    count++;
+                    if ("DONE".equals(entry.status)) {
+                        continue;
+                    }
 
-                Path filePath = dir.toPath().resolve(entry.path);
-                if (!Files.exists(filePath)) {
-                    spec.commandLine().getOut().println(Ansi.AUTO.string("\r\033[K@|yellow Skipping (file missing):|@ " + entry.path));
-                    entry.status = "DONE";
-                    pList.save(listFile);
-                    continue;
-                }
+                    if (!dir.exists()) {
+                        spec.commandLine().getErr().println(Ansi.AUTO.string("\n@|red Error: Drive or directory disconnected:|@ " + dir.getAbsolutePath()));
+                        return 1;
+                    }
 
-                String prefix = Ansi.AUTO.string("@|blue [" + count + "/" + total + "]|@ ");
-                processFile(filePath, dir, prefix);
-                
-                entry.status = "DONE";
-                pList.save(listFile);
+                    Path filePath = dir.toPath().resolve(entry.path);
+                    if (!Files.exists(filePath)) {
+                        spec.commandLine().getOut().println(Ansi.AUTO.string("\r\033[K@|yellow Skipping (file missing):|@ " + entry.path));
+                        // Keep status as PENDING
+                        continue;
+                    }
+
+                    String prefix = Ansi.AUTO.string("@|blue [" + count + "/" + total + "]|@ ");
+                    boolean success = processFile(filePath, dir, prefix);
+                    
+                    if (success) {
+                        entry.status = "DONE";
+                        pList.save(listFile);
+                    }
+                }
+            } catch (Exception e) {
+                if (e.getMessage() != null && e.getMessage().contains("Drive disconnected")) {
+                    spec.commandLine().getErr().println(Ansi.AUTO.string("\n@|bold,red FATAL ERROR:|@ " + e.getMessage()));
+                    return 1;
+                }
+                throw e;
             }
 
             if (listFile.exists()) {
@@ -162,7 +176,7 @@ public class TagCommand implements Callable<Integer> {
         return name.endsWith(".mp4") || name.endsWith(".mov") || name.endsWith(".m4v") || name.endsWith(".avi");
     }
 
-    private void processFile(Path path, File rootDirectory, String prefix) {
+    private boolean processFile(Path path, File rootDirectory, String prefix) {
         String fullPath = path.toAbsolutePath().toString();
         String relativePath = rootDirectory.toPath().relativize(path).toString();
 
@@ -175,7 +189,7 @@ public class TagCommand implements Callable<Integer> {
             spec.commandLine().getOut().print("\r\033[K" + prefix + Ansi.AUTO
                     .string("@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (No descriptive words in path)"));
             spec.commandLine().getOut().flush();
-            return;
+            return true;
         }
 
         try {
@@ -186,13 +200,13 @@ public class TagCommand implements Callable<Integer> {
                 spec.commandLine().getOut().print("\r\033[K" + prefix + Ansi.AUTO.string(
                         "@|yellow \u23ED\uFE0F  Skipping:|@ " + fullPath + " (Already tagged with Pro-Prompt)"));
                 spec.commandLine().getOut().flush();
-                return;
+                return true;
             }
 
             List<String> generatedTags = getTagsFromOllama(relativePath);
             if (generatedTags == null || generatedTags.isEmpty()) {
                 // No tags -> do not print, next file will overwrite
-                return;
+                return true;
             }
 
             List<String> tagsToAdd = filterNewTags(metadata.keywords, generatedTags);
@@ -203,7 +217,7 @@ public class TagCommand implements Callable<Integer> {
                 if (!dryRun) {
                     writeInstructionsTag(path);
                 }
-                return;
+                return true;
             }
 
             // Aggregate all tags: existing (union) + new from AI
@@ -219,9 +233,14 @@ public class TagCommand implements Callable<Integer> {
                 spec.commandLine().getOut().println(Ansi.AUTO.string("@|green [Written]|@"));
             }
 
+            return true;
         } catch (Exception e) {
             String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
             spec.commandLine().getOut().println(Ansi.AUTO.string("\n@|red [ERROR: " + msg + "]|@"));
+            if (msg.toLowerCase().contains("device not configured") || msg.toLowerCase().contains("no such device")) {
+                throw new RuntimeException("Drive disconnected: " + msg);
+            }
+            return false;
         }
     }
 
