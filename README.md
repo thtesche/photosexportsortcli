@@ -165,6 +165,14 @@ It will guide you through setting the release version and the next development s
 
 ---
 
+## 🔗 Related Projects
+
+If you find this tool useful, you might also be interested in:
+
+* **[synofoto-graph-sync](https://github.com/thtesche/synofoto-graph-sync):** A specialized tool to synchronize Synology Photos metadata and AI-generated tags into a Memgraph or Neo4j graph database, enabling advanced relationship analysis and semantic querying of your photo collection.
+
+---
+
 ## 🤝 Contributing
 
 1. Fork the repository
